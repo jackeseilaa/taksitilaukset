@@ -32,7 +32,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-    // PÄIVITETTY KONFIGURAATIO UUDELLA AVAIMELLA
+    // KÄYTETÄÄN UUTTA API-AVAINTA
     const firebaseConfig = {
         apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
         authDomain: "jsailing-f716c.firebaseapp.com",
@@ -55,25 +55,22 @@
         e.preventDefault();
         document.getElementById('status').innerHTML = "Avataan väylää<span class='loader'></span>";
         
-        // signInWithPopup on varmempi iPadilla kuin Redirect
         signInWithPopup(auth, provider)
             .then((result) => {
                 console.log("Kirjautuminen onnistui:", result.user.email);
                 handleUserLogin(result.user);
             })
             .catch((error) => {
-                console.error("Virhe koodi:", error.code);
+                console.error("Virhe:", error.code);
                 if (error.code === 'auth/popup-blocked') {
-                    document.getElementById('status').innerText = "⚠️ Salli ponnahdusikkunat selaimen asetuksista.";
-                } else if (error.code === 'auth/api-key-not-valid') {
-                    document.getElementById('status').innerText = "⚠️ API-avain aktivoituu... Odota minuutti ja päivitä sivu.";
+                    document.getElementById('status').innerText = "⚠️ Selain esti ikkunan. Salli ponnahdusikkunat asetuksista.";
                 } else {
                     document.getElementById('status').innerText = "Virhe: " + error.message;
                 }
             });
     };
 
-    // Tarkistetaan onko käyttäjä jo sisällä (esim. sivun latautuessa uudelleen)
+    // Tarkistetaan onko käyttäjä jo sisällä
     onAuthStateChanged(auth, (user) => {
         if (user) {
             if (user.email === "jacke.seilaa@gmail.com") {
@@ -83,8 +80,8 @@
                     <div style="padding: 50px; text-align: center;">
                         <h1 style="color:#ff6b6b">PÄÄSY EVÄTTY</h1>
                         <p>Käyttäjä: ${user.email}</p>
-                        <p>Sinulla ei ole oikeuksia tähän sovellukseen.</p>
-                        <button onclick="auth.signOut().then(() => location.reload())" style="padding:10px; margin-top:20px; cursor:pointer;">KIRJAUDU ULOS</button>
+                        <p>Sinulla ei ole oikeuksia.</p>
+                        <button onclick="auth.signOut().then(() => location.reload())" style="padding:10px; margin-top:20px;">KIRJAUDU ULOS</button>
                     </div>`;
             }
         }
@@ -97,7 +94,10 @@
                 <p>Tervetuloa takaisin, Jacke.</p>
                 <p style="font-size: 0.9rem; color: #888;">${user.email}</p>
                 <div style="margin-top:30px;">
-                    <button onclick="location.href='/tilaukset/'" style="padding:15px 30px; background:#c8f050; color:#000; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem;">AVAA LISTA</button>
+                    <button onclick="location.href='https://jackeseilaa.github.io/taksitilaukset/'" 
+                            style="padding:15px 30px; background:#c8f050; color:#000; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1rem;">
+                        AVAA LISTA
+                    </button>
                 </div>
             </div>`;
     }
