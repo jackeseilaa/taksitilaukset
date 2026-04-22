@@ -7,28 +7,28 @@
     <style>
         body { background: #0f0f0f; color: #fff; font-family: sans-serif; text-align: center; padding-top: 15vh; margin: 0; }
         .btn-fix { 
-            background: #fff; color: #000; padding: 20px 40px; 
-            border-radius: 50px; font-weight: 900; font-size: 1.2rem; 
-            border: 4px solid #c8f050; cursor: pointer; text-decoration: none;
-            display: inline-block; box-shadow: 0 0 20px rgba(200, 240, 80, 0.4);
+            background: #fff; color: #000; padding: 25px 50px; 
+            border-radius: 50px; font-weight: 900; font-size: 1.4rem; 
+            border: 4px solid #c8f050; cursor: pointer;
+            box-shadow: 0 0 30px rgba(200, 240, 80, 0.3);
         }
-        #status { margin-top: 30px; color: #888; font-family: monospace; font-size: 0.8rem; }
-        .version { color: #333; font-size: 0.7rem; margin-top: 50px; }
+        #status { margin-top: 30px; color: #c8f050; font-weight: bold; }
+        .v-tag { color: #333; font-size: 0.7rem; margin-top: 50px; }
     </style>
 </head>
 <body>
 
     <h1 style="color: #c8f050; font-size: 2.5rem;">KULJETUSKIRJA</h1>
-    <p style="margin-bottom: 40px; color: #aaa;">iPad Safari -optimoitu</p>
+    <p style="margin-bottom: 40px; color: #aaa;">Pääsy varmistettuun väylään</p>
 
     <button id="startBtn" class="btn-fix">KIRJAUDU TÄSTÄ</button>
 
-    <div id="status">Tila: Odottaa klikkausta</div>
-    <div class="version">Versio 1.2 - Safari Fix</div>
+    <div id="status">Tila: Valmis</div>
+    <div class="v-tag">Versio 1.3 (Redirect-malli)</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
@@ -43,35 +43,30 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    // Pakotetaan Firebase muistamaan kirjautuminen iPadilla paremmin
-    setPersistence(auth, browserLocalPersistence);
-
-    document.getElementById('startBtn').onclick = async (e) => {
-        e.preventDefault();
-        document.getElementById('status').innerText = "Valmistellaan ikkunaa...";
-        
-        try {
-            // Safari vaatii, että tämä tapahtuu täsmälleen klikkauksesta
-            await signInWithPopup(auth, provider);
-        } catch (error) {
-            console.error(error);
-            document.getElementById('status').innerText = "Virhe: " + error.code;
-            
-            if (error.code === 'auth/popup-blocked') {
-                alert("Salli ponnahdusikkunat Safarin asetuksista!");
-            }
+    // 1. Tarkistetaan heti kun tullaan takaisin Googlesta
+    getRedirectResult(auth).catch((error) => {
+        if (error.code !== 'auth/redirect-cancelled-by-user') {
+            document.getElementById('status').innerText = "Virhe palatessa: " + error.message;
         }
+    });
+
+    // 2. Napin painallus ohjaa Googleen
+    document.getElementById('startBtn').onclick = (e) => {
+        e.preventDefault();
+        document.getElementById('status').innerText = "Siirrytään Google-varmistukseen...";
+        signInWithRedirect(auth, provider);
     };
 
+    // 3. Kun käyttäjä on tunnistettu
     onAuthStateChanged(auth, (user) => {
         if (user && user.email === "jacke.seilaa@gmail.com") {
             document.body.innerHTML = `
                 <div style="padding: 50px;">
-                    <h1 style="color:#c8f050">TERVETULOA</h1>
-                    <p>Kirjautuminen onnistui!</p>
-                    <button onclick="window.location.href='https://jackeseilaa.github.io/taksitilaukset/'" 
-                            style="padding:15px 30px; background:#c8f050; color:#000; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">
-                        AVAA TAKSITILAUKSET TÄSTÄ
+                    <h1 style="color:#c8f050; font-size: 3rem;">TERVETULOA</h1>
+                    <p>Jacke, yhteys on auki.</p>
+                    <button onclick="window.location.replace('https://jackeseilaa.github.io/taksitilaukset/')" 
+                            style="padding:20px 40px; background:#c8f050; color:#000; border:none; border-radius:15px; cursor:pointer; font-weight:bold; font-size:1.2rem; margin-top:20px;">
+                        AVAA TAKSITILAUKSET
                     </button>
                 </div>`;
         }
