@@ -8,57 +8,65 @@
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #888; --danger: #f05050; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px 16px; display: flex; flex-direction: column; }
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
-        h1 { font-family: 'Syne', sans-serif; font-size: 1.8rem; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
-        .input-area { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-        textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 12px; min-height: 120px; outline: none; font-family: 'DM Mono', monospace; border: 1px solid var(--border); }
-        button { font-family: 'Syne', sans-serif; font-weight: 600; padding: 12px 15px; border: none; border-radius: 6px; cursor: pointer; }
-        .btn-primary { background: var(--accent); color: #0f0f0f; width: 100%; margin-top: 10px; }
-        .btn-login { background: white; color: black; padding: 15px 30px; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(255,255,255,0.1); }
+        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        h1 { font-family: 'Syne', sans-serif; font-size: 1.5rem; color: var(--accent); }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 15px; min-height: 120px; outline: none; font-size: 0.9rem; margin-bottom: 10px; }
+        button { font-family: 'Syne', sans-serif; font-weight: 700; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .btn-primary { background: var(--accent); color: #000; width: 100%; }
+        .btn-login { background: #fff; color: #000; font-size: 1rem; padding: 15px 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.8rem; }
+        th { text-align: left; color: var(--accent2); padding: 12px; border-bottom: 2px solid var(--border); text-transform: uppercase; }
+        td { padding: 12px; border-bottom: 1px solid #222; }
+        #auth-section { text-align: center; margin-top: 100px; }
         #app-content { display: none; }
-        #auth-section { text-align: center; padding-top: 100px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 20px; }
-        th { text-align: left; color: var(--accent2); padding: 10px; border-bottom: 1px solid var(--border); }
-        td { padding: 10px; border-bottom: 1px solid #222; }
-        .version-tag { font-size: 0.6rem; color: var(--muted); text-align: center; margin-top: auto; padding-top: 30px; opacity: 0.5; }
     </style>
 </head>
 <body>
 
 <div id="auth-section">
-    <h1>Kuljetuskirja</h1>
-    <p style="margin: 20px 0; color: var(--muted);">Kirjaudu sisään hallinnoidaksesi ajoja.</p>
+    <h1>KULJETUSKIRJA</h1>
+    <p style="color: var(--muted); margin: 20px 0;">Kirjaudu sisään hallinnoidaksesi ajoja.</p>
     <button class="btn-login" id="btnLogin">KIRJAUDU GOOGLELLA</button>
 </div>
 
 <div id="app-content">
     <header>
-        <h1>Kuljetuskirja</h1>
-        <button id="btnLogout" style="background:none; color:var(--muted); border:1px solid var(--border); font-size:0.7rem;">Ulos</button>
+        <h1>KULJETUSKIRJA</h1>
+        <button id="btnLogout" style="background:none; color:var(--muted); border:1px solid var(--border); font-size:0.7rem;">ULOS</button>
     </header>
-    <div class="input-area">
-        <textarea id="msgInput" placeholder="Liitä WhatsApp-viesti..."></textarea>
+
+    <div class="card">
+        <textarea id="msgInput" placeholder="Liitä WhatsApp-viesti tähän..."></textarea>
         <button class="btn-primary" id="btnAdd">LISÄÄ LISTAAN</button>
     </div>
+
     <div style="overflow-x: auto;">
         <table>
-            <thead><tr><th>Pvm</th><th>Klo</th><th>Reitti</th><th>€</th><th></th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Pvm</th>
+                    <th>Klo</th>
+                    <th>Reitti</th>
+                    <th>€</th>
+                    <th></th>
+                </tr>
+            </thead>
             <tbody id="tbody"></tbody>
         </table>
     </div>
 </div>
-
-<div class="version-tag">Versio 1.0.3 (Auth Logic Fix)</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     import { getAuth, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
+    // Asetukset kuviesi perusteella
     const firebaseConfig = {
         apiKey: "AIzaSyB7Dp5_5fN0Iko-4Jn1D2Dp6NNNih63U0O",
-        authDomain: "jsailing-f716c.firebaseapp.com",
+        authDomain: "jsailing-f716c.firebaseapp.com", 
         projectId: "jsailing-f716c",
         storageBucket: "jsailing-f716c.firebasestorage.app",
         messagingSenderId: "543523103696",
@@ -70,35 +78,19 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    // NAPPITOIMINNOT
-    const btnLogin = document.getElementById('btnLogin');
-    const btnLogout = document.getElementById('btnLogout');
-    const btnAdd = document.getElementById('btnAdd');
+    // Kirjautumisen hallinta
+    document.getElementById('btnLogin').onclick = () => signInWithRedirect(auth, provider);
+    document.getElementById('btnLogout').onclick = () => signOut(auth);
 
-    if (btnLogin) {
-        btnLogin.onclick = () => {
-            console.log("Kirjautumista yritetään...");
-            signInWithRedirect(auth, provider);
-        };
-    }
-
-    if (btnLogout) {
-        btnLogout.onclick = () => signOut(auth);
-    }
-
-    // AUTH-TILAN SEURANTA
     onAuthStateChanged(auth, (user) => {
+        // Varmistetaan sähköposti sääntöjen mukaisesti
         if (user && user.email === "jacke.seilaa@gmail.com") {
             document.getElementById('auth-section').style.display = 'none';
             document.getElementById('app-content').style.display = 'block';
             startListening();
-        } else {
-            document.getElementById('auth-section').style.display = 'block';
-            document.getElementById('app-content').style.display = 'none';
-            if (user) {
-                alert("Ei oikeutta: " + user.email);
-                signOut(auth);
-            }
+        } else if (user) {
+            alert("Pääsy vain jacke.seilaa@gmail.com");
+            signOut(auth);
         }
     });
 
@@ -113,125 +105,9 @@
                 tr.innerHTML = `
                     <td>${r.date || ''}</td>
                     <td>${r.time || ''}</td>
-                    <td><div style="font-size:0.65rem; color:var(--muted)">${r.from || ''}</div>${r.to || ''}</td>
-                    <td style="color:var(--accent)">${r.price || '0'}€</td>
-                    <td><button onclick="window.del('${d.id}')" style="background:none; color:var(--danger); border:none;">✕</button></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        });
-    }
-
-    btnAdd.onclick = async () => {
-        const input = document.getElementById('msgInput');
-        const text = input.value.trim();
-        if(!text) return;
-
-        const lines = text.split('\n').map(l => l.trim());
-        const data = {
-            date: text.match(/(\d{1,2})\.(\d{1,2})/)?.[0] || '',
-            time: text.match(/(\d{1,2})[.:](\d{2})/)?.[0] || '',
-            from: lines.find(l => l.toLowerCase().includes('lähtö'))?.replace(/lähtö:?/i, '').trim() || '?',
-            to: lines.find(l => l.toLowerCase().includes('meno') || l.toLowerCase().includes('kohde'))?.replace(/meno:?|kohde:?/i, '').trim() || '?',
-            price: text.match(/(\d+)\s*[€eE]/)?.[1] || '0',
-            createdAt: new Date()
-        };
-
-        try {
-            await addDoc(collection(db, "taksitulot"), data);
-            input.value = '';
-        } catch (e) {
-            console.error(e);
-            alert("Tallennus epäonnistui!");
-        }
-    };
-
-    window.del = (id) => confirm("Poistetaanko?") && deleteDoc(doc(db, "taksitulot", id));
-</script>
-</body>
-</html><div id="app-content">
-    <header>
-        <h1>Kuljetuskirja</h1>
-        <button id="btnLogout" style="background:none; color:var(--muted); border:1px solid var(--border); font-size:0.7rem; padding: 4px 8px;">Kirjaudu ulos</button>
-    </header>
-    <div class="input-area">
-        <textarea id="msgInput" placeholder="Liitä WhatsApp-viesti tähän..."></textarea>
-        <button class="btn-primary" id="btnAdd">➕ LISÄÄ LISTAAN</button>
-    </div>
-    <div style="overflow-x: auto;">
-        <table>
-            <thead><tr><th>Pvm</th><th>Klo</th><th>Reitti</th><th>Hinta</th><th></th></tr></thead>
-            <tbody id="tbody"></tbody>
-        </table>
-    </div>
-</div>
-
-<div class="version-tag">Versio 1.0.2 (Error Log Enabled)</div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyB7Dp5_5fN0Iko-4Jn1D2Dp6NNNih63U0O",
-        authDomain: "jsailing-f716c.firebaseapp.com",
-        projectId: "jsailing-f716c",
-        storageBucket: "jsailing-f716c.firebasestorage.app",
-        messagingSenderId: "543523103696",
-        appId: "1:543523103696:web:439a312efa6aec398a8fd5"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-
-    const errDiv = document.getElementById('error-display');
-
-    document.getElementById('btnLogin').onclick = () => {
-        errDiv.style.display = 'none';
-        signInWithRedirect(auth, provider);
-    };
-
-    document.getElementById('btnLogout').onclick = () => signOut(auth);
-
-    // Poimitaan kirjautumisvirheet talteen
-    getRedirectResult(auth).catch((error) => {
-        errDiv.innerText = "Virhe: " + error.message;
-        errDiv.style.display = 'block';
-        console.error(error);
-    });
-
-    onAuthStateChanged(auth, (user) => {
-        if (user && user.email === "jacke.seilaa@gmail.com") {
-            document.getElementById('auth-section').style.display = 'none';
-            document.getElementById('app-content').style.display = 'block';
-            startListening();
-        } else if (user) {
-            errDiv.innerText = "Pääsy kielletty sähköpostilla: " + user.email;
-            errDiv.style.display = 'block';
-            signOut(auth);
-        } else {
-            document.getElementById('auth-section').style.display = 'block';
-            document.getElementById('app-content').style.display = 'none';
-        }
-    });
-
-    function startListening() {
-        const q = query(collection(db, "taksitulot"), orderBy("createdAt", "desc"));
-        onSnapshot(q, (snapshot) => {
-            const tbody = document.getElementById('tbody');
-            tbody.innerHTML = '';
-            snapshot.forEach(d => {
-                const r = d.data();
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${r.date || '-'}</td>
-                    <td>${r.time || '-'}</td>
-                    <td><div style="color:var(--muted); font-size:0.7rem;">${r.from || '?'}</div>${r.to || '?'}</td>
-                    <td style="color:var(--accent)">${r.price || '0'}€</td>
-                    <td><button onclick="window.del('${d.id}')" style="background:none; color:var(--danger); border:none;">✕</button></td>
+                    <td><div style="font-size:0.7rem; color:var(--muted)">${r.from}</div>${r.to}</td>
+                    <td style="color:var(--accent); font-weight:bold;">${r.price}€</td>
+                    <td><button onclick="window.del('${d.id}')" style="background:none; color:var(--danger)">✕</button></td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -240,21 +116,23 @@
 
     document.getElementById('btnAdd').onclick = async () => {
         const text = document.getElementById('msgInput').value;
-        if(!text.trim()) return;
+        if(!text) return;
+        
         const lines = text.split('\n').map(l => l.trim());
         const data = {
-            date: text.match(/(\d{1,2})\.(\d{1,2})/)?.[0] || '',
+            date: text.match(/(\d{1,2})\.(\d{1,2})/)?.[0] || new Date().toLocaleDateString('fi-FI'),
             time: text.match(/(\d{1,2})[.:](\d{2})/)?.[0] || '',
-            from: lines.find(l => l.toLowerCase().includes('lähtö'))?.replace(/lähtö:?/i, '').trim() || '?',
-            to: lines.find(l => l.toLowerCase().includes('meno') || l.toLowerCase().includes('kohde'))?.replace(/meno:?|kohde:?/i, '').trim() || '?',
+            from: lines.find(l => l.toLowerCase().includes('lähtö'))?.replace(/lähtö/i, '').trim() || '?',
+            to: lines.find(l => l.toLowerCase().includes('meno') || l.toLowerCase().includes('kohde'))?.replace(/meno|kohde/i, '').trim() || '?',
             price: text.match(/(\d+)\s*[€eE]/)?.[1] || '0',
             createdAt: new Date()
         };
+        
         await addDoc(collection(db, "taksitulot"), data);
         document.getElementById('msgInput').value = '';
     };
 
-    window.del = (id) => confirm("Poistetaanko?") && deleteDoc(doc(db, "taksitulot", id));
+    window.del = (id) => confirm("Poistetaanko rivi?") && deleteDoc(doc(db, "taksitulot", id));
 </script>
 </body>
 </html>
