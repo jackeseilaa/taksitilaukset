@@ -2,24 +2,29 @@
 <html lang="fi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kuljetuskirja Testi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kuljetuskirja</title>
     <style>
-        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding-top: 50px; }
-        button { background: #c8f050; color: #000; padding: 20px 40px; font-size: 1.2rem; border-radius: 10px; border: none; font-weight: bold; }
+        body { background: #0f0f0f; color: #f0f0f0; font-family: sans-serif; text-align: center; padding-top: 20vh; margin: 0; }
+        .container { padding: 20px; }
+        h1 { color: #c8f050; font-size: 2rem; margin-bottom: 10px; }
+        button { background: #fff; color: #000; padding: 20px 40px; font-size: 1.1rem; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; width: 100%; max-width: 300px; }
+        #status { margin-top: 20px; color: #888; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
+<div class="container" id="auth-section">
     <h1>KULJETUSKIRJA</h1>
-    <p id="info">Paina nappia kirjautuaksesi</p>
+    <p>Kirjaudu hallinnoimaan ajoja</p>
     <br>
-    <button id="btn">KIRJAUDU SISÄÄN</button>
+    <button id="btn">KIRJAUDU GOOGLELLA</button>
+    <p id="status">Paina nappia aloittaaksesi</p>
+</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyB7Dp5_5fN0Iko-4Jn1D2Dp6NNNih63U0O",
@@ -32,19 +37,27 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
     const provider = new GoogleAuthProvider();
 
-    // TÄMÄ ON TÄRKEÄ: Nappi reagoi suoraan klikkaukseen
+    // Pakotetaan tilin valinta, mikä auttaa iPadia "heräämään"
+    provider.setCustomParameters({ prompt: 'select_account' });
+
     document.getElementById('btn').addEventListener('click', () => {
-        document.getElementById('info').innerText = "Yhdistetään Googleen...";
+        document.getElementById('status').innerText = "Avataan Google... Jos sivu ei vaihdu, varmista että internetyhteys on vakaa.";
+        
+        // Käytetään suoraa redirectia ilman ylimääräisiä varmistuksia
         signInWithRedirect(auth, provider);
     });
 
     onAuthStateChanged(auth, (user) => {
         if (user && user.email === "jacke.seilaa@gmail.com") {
-            document.body.innerHTML = `<h1>Tervetuloa Jacke!</h1><p>Kirjautuminen onnistui.</p>`;
-            // Tähän tulee myöhemmin varsinainen käyttöliittymä, testataan ensin tämä.
+            // Kun kirjautuminen onnistuu, ohjataan varsinaiseen sovellukseen tai näytetään sisältö
+            document.body.innerHTML = `
+                <div style="padding:20px;">
+                    <h1 style="color:#c8f050">TERVE JACKE!</h1>
+                    <p>Kirjautuminen onnistui. Voit nyt lisätä ajoja.</p>
+                    <button onclick="location.reload()" style="background:#888; color:#fff; padding:10px;">LATAA SOVELLUS</button>
+                </div>`;
         }
     });
 </script>
