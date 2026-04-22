@@ -4,53 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Kuljetuskirja</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --text: #f0f0f0; --muted: #888; }
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .container { width: 100%; max-width: 500px; margin-top: 15vh; text-align: center; }
-        h1 { font-family: 'Syne', sans-serif; color: var(--accent); font-size: 2rem; margin-bottom: 20px; }
-        .btn-login { background: #fff; color: #000; padding: 20px 40px; border-radius: 12px; font-weight: 800; font-size: 1.1rem; border: none; cursor: pointer; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); transition: 0.2s; }
-        .btn-login:active { transform: scale(0.98); background: #eee; }
-        #app-content { display: none; width: 100%; max-width: 600px; margin-top: 20px; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 20px; }
-        textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--text); padding: 15px; min-height: 150px; font-size: 16px; outline: none; margin-bottom: 10px; }
-        .btn-add { background: var(--accent); color: #000; width: 100%; padding: 15px; border-radius: 12px; font-weight: 700; border: none; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
-        th { text-align: left; color: var(--accent); padding: 10px; border-bottom: 1px solid var(--border); }
-        td { padding: 10px; border-bottom: 1px solid #222; }
+        body { background: #0f0f0f; color: #fff; font-family: sans-serif; text-align: center; padding-top: 20vh; margin: 0; }
+        .btn-fix { 
+            background: #fff; color: #000; padding: 20px 40px; 
+            border-radius: 50px; font-weight: 900; font-size: 1.2rem; 
+            border: 4px solid #c8f050; cursor: pointer; text-decoration: none;
+            display: inline-block; box-shadow: 0 0 20px rgba(200, 240, 80, 0.4);
+        }
+        #status { margin-top: 30px; color: #888; font-family: monospace; }
     </style>
 </head>
 <body>
 
-<div id="auth-section" class="container">
-    <h1>KULJETUSKIRJA</h1>
-    <button class="btn-login" id="btnLogin">KIRJAUDU SISÄÄN</button>
-    <p id="status" style="margin-top:20px; color:var(--muted); font-size:0.8rem;">Paina nappia kerran ja odota hetki.</p>
-</div>
-
-<div id="app-content">
-    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h1 style="font-size:1.2rem; margin:0;">AJO-LISTA</h1>
-        <button id="btnLogout" style="background:none; color:var(--muted); border:1px solid var(--border); padding:8px 15px; border-radius:8px; font-size:0.8rem;">ULOS</button>
-    </header>
-    <div class="card">
-        <textarea id="msgInput" placeholder="Liitä WhatsApp-viesti..."></textarea>
-        <button class="btn-add" id="btnAdd">LISÄÄ TIETOIHIN</button>
-    </div>
-    <div class="card">
-        <table>
-            <thead><tr><th>Klo</th><th>Reitti</th><th>€</th></tr></thead>
-            <tbody id="tbody"></tbody>
-        </table>
-    </div>
-</div>
+    <h1 style="color: #c8f050; font-size: 2.5rem;">KULJETUSKIRJA</h1>
+    <p style="margin-bottom: 40px;">iPad-yhteys varmistettu</p>
+    
+    <button id="startBtn" class="btn-fix">KIRJAUDU TÄSTÄ</button>
+    
+    <div id="status">Tila: Odottaa klikkausta</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyB7Dp5_5fN0Iko-4Jn1D2Dp6NNNih63U0O",
@@ -63,61 +39,34 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
     const provider = new GoogleAuthProvider();
+
+    // Pakotetaan Google kysymään tiliä (tämä yleensä ohittaa Safarin "jäätymisen")
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    // Tarkistetaan onko palattu kirjautumisesta
-    getRedirectResult(auth).catch(err => {
-        if(err.code !== 'auth/invalid-pending-token') {
-            document.getElementById('status').innerText = "Yritä uudelleen: " + err.message;
+    // Tarkistetaan heti onko tultu takaisin
+    getRedirectResult(auth).catch((error) => {
+        if (error.code === 'auth/cross-origin-auth-not-integrated-client') {
+            document.getElementById('status').innerText = "Safari estää yhteyden. Kokeile Incognito-tilaa.";
         }
     });
 
-    document.getElementById('btnLogin').onclick = async () => {
-        document.getElementById('status').innerText = "Valmistellaan kirjautumista...";
-        try {
-            await setPersistence(auth, browserLocalPersistence);
-            signInWithRedirect(auth, provider);
-        } catch (e) {
-            document.getElementById('status').innerText = "Virhe: " + e.message;
-        }
+    document.getElementById('startBtn').onclick = () => {
+        document.getElementById('status').innerText = "Avataan varmistettua väylää...";
+        // Tämä on se kohta joka Safari usein blokkaa, jos se ei tule suoraan klikkauksesta
+        signInWithRedirect(auth, provider);
     };
-
-    document.getElementById('btnLogout').onclick = () => signOut(auth).then(() => location.reload());
 
     onAuthStateChanged(auth, (user) => {
         if (user && user.email === "jacke.seilaa@gmail.com") {
-            document.getElementById('auth-section').style.display = 'none';
-            document.getElementById('app-content').style.display = 'block';
-            startApp();
+            document.body.innerHTML = `
+                <div style="padding: 50px;">
+                    <h1 style="color:#c8f050">PÄÄSY SALLITTU</h1>
+                    <p>Tervetuloa takaisin, Jacke.</p>
+                    <button onclick="location.reload()" style="padding:10px; margin-top:20px;">AVAA LISTA</button>
+                </div>`;
         }
     });
-
-    function startApp() {
-        const q = query(collection(db, "taksitulot"), orderBy("createdAt", "desc"));
-        onSnapshot(q, (snapshot) => {
-            const tbody = document.getElementById('tbody');
-            tbody.innerHTML = '';
-            snapshot.forEach(doc => {
-                const r = doc.data();
-                tbody.innerHTML += `<tr><td>${r.time||''}</td><td>${r.to||''}</td><td style="color:var(--accent); font-weight:bold;">${r.price}€</td></tr>`;
-            });
-        });
-    }
-
-    document.getElementById('btnAdd').onclick = async () => {
-        const text = document.getElementById('msgInput').value;
-        if(!text) return;
-        const data = {
-            time: text.match(/(\d{1,2})[.:](\d{2})/)?.[0] || '',
-            to: text.split('\n')[2] || 'Tuntematon',
-            price: text.match(/(\d+)\s*[€eE]/)?.[1] || '0',
-            createdAt: new Date()
-        };
-        await addDoc(collection(db, "taksitulot"), data);
-        document.getElementById('msgInput').value = '';
-    };
 </script>
 </body>
 </html>
