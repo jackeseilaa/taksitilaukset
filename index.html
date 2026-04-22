@@ -1,147 +1,37 @@
-<!DOCTYPE html>
-<html lang="fi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kuljetuskirja V26</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
-    <style>
-        :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 15px; }
-        .v-tag { color: var(--muted); font-size: 10px; text-align: center; margin-bottom: 10px; }
-        h1 { font-family: 'Syne', sans-serif; font-size: 1.4rem; text-align: center; color: var(--accent); margin-bottom: 20px; }
-        #auth-section { text-align: center; padding: 50px 0; }
-        .btn-login { background: white; color: black; padding: 15px 25px; border-radius: 50px; font-weight: bold; border: none; cursor: pointer; }
-        #app-content { display: none; }
-        textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 180px; outline: none; font-size: 0.85rem; }
-        .btn-add { background: var(--accent); color: black; width: 100%; padding: 15px; border-radius: 8px; font-weight: bold; border: none; margin-bottom: 10px; cursor: pointer; font-size: 1rem; }
-        .btn-excel { background: var(--surface); color: var(--accent2); width: 100%; padding: 10px; border-radius: 8px; font-weight: bold; border: 1px solid var(--border); margin-bottom: 20px; cursor: pointer; }
-        .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
-        table { width: 100%; border-collapse: collapse; font-size: 0.7rem; min-width: 800px; }
-        th { text-align: left; color: var(--accent2); padding: 10px; border-bottom: 1px solid var(--border); background: #222; }
-        td { padding: 10px; border-bottom: 1px solid #222; vertical-align: top; }
-        .price-col { color: var(--accent); font-weight: bold; }
-    </style>
-</head>
-<body>
-
-    <div class="v-tag">VERSIO 26.0 (TÄYSI DATA)</div>
-
-    <div id="auth-section">
-        <h1>KULJETUSKIRJA</h1>
-        <button class="btn-login" id="btnLogin">KIRJAUDU GOOGLE-TUNNUKSELLA</button>
-    </div>
-
-    <div id="app-content">
-        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; margin-bottom: 10px; color: var(--muted);">
-            <span id="userEmail"></span>
-            <button onclick="auth.signOut()" style="background:none; color:inherit; border:none; text-decoration:underline;">Ulos</button>
-        </div>
-        
-        <h1>UUSI TILAUS</h1>
-        <textarea id="msgInput" placeholder="Liitä koko WhatsApp-viesti tähän..."></textarea>
-        <button class="btn-add" id="btnAdd">TALLENNA TILAUS</button>
-        <button class="btn-excel" id="btnExport">📥 LATAA EXCEL (CSV)</button>
-
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Pvm</th><th>Klo</th><th>Lähtö</th><th>Meno</th><th>Asiakas/Puh</th><th>Hinta/Tyyppi</th><th>Lasku/Tilaaja</th><th>Huomio</th><th></th>
-                    </tr>
-                </thead>
-                <tbody id="tbody"></tbody>
-            </table>
-        </div>
-    </div>
-
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getAuth, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
-        authDomain: "jsailing-f716c.firebaseapp.com",
-        projectId: "jsailing-f716c",
-        storageBucket: "jsailing-f716c.firebasestorage.app",
-        messagingSenderId: "543523103696",
-        appId: "1:543523103696:web:439a312efa6aec398a8fd5"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-    window.auth = auth;
-
-    let currentLogs = [];
-
-    onAuthStateChanged(auth, (user) => {
-        if (user && user.email === "jacke.seilaa@gmail.com") {
-            document.getElementById('auth-section').style.display = 'none';
-            document.getElementById('app-content').style.display = 'block';
-            document.getElementById('userEmail').innerText = user.email;
-            startListening();
-        } else {
-            document.getElementById('auth-section').style.display = 'block';
-            document.getElementById('app-content').style.display = 'none';
-            if(user) signOut(auth);
-        }
-    });
-
-    document.getElementById('btnLogin').onclick = () => signInWithRedirect(auth, new GoogleAuthProvider());
-
-    function startListening() {
-        const q = query(collection(db, "taksitulot"), orderBy("createdAt", "desc"));
-        onSnapshot(q, (snapshot) => {
-            const tbody = document.getElementById('tbody');
-            tbody.innerHTML = '';
-            currentLogs = [];
-            snapshot.forEach(d => {
-                const r = d.data();
-                currentLogs.push(r);
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${r.date}</td>
-                    <td>${r.time}</td>
-                    <td>${r.from}</td>
-                    <td>${r.to}</td>
-                    <td>${r.customer}<br><small>${r.phone}</small></td>
-                    <td class="price-col">${r.price}€<br><small>${r.type}</small></td>
-                    <td>${r.billing}<br><small>${r.booker}</small></td>
-                    <td><small>${r.notes}</small></td>
-                    <td><button onclick="delItem('${d.id}')" style="background:none; border:none; color:#f05050; cursor:pointer;">✕</button></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        });
-    }
-
-    window.delItem = (id) => confirm("Poistetaanko?") && deleteDoc(doc(db, "taksitulot", id));
+    // ... (Firebase-alustukset säilyvät samoina) ...
 
     document.getElementById('btnAdd').onclick = async () => {
         const text = document.getElementById('msgInput').value;
         if(!text) return;
-        const lines = text.split('\n').map(l => l.trim());
         
-        const findLineAfter = (keyword) => {
+        // Puhdistetaan viesti ja jaetaan riveihin
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        
+        // Apufunktio: Etsii rivin, joka sisältää hakusanan, ja palauttaa SEURAAVAN rivin
+        const getNextLine = (keyword) => {
             const idx = lines.findIndex(l => l.toLowerCase().includes(keyword.toLowerCase()));
-            return (idx !== -1 && lines[idx+1]) ? lines[idx+1] : '';
+            return (idx !== -1 && lines[idx+1]) ? lines[idx+1] : '—'; // Jos ei löydy, laitetaan viiva
+        };
+
+        // Apufunktio: Etsii rivin, joka ALKAA hakusanalla (esim. "Nimi:")
+        const getValueAfter = (keyword) => {
+            const line = lines.find(l => l.toLowerCase().startsWith(keyword.toLowerCase()));
+            return line ? line.split(':').slice(1).join(':').trim() : '—';
         };
 
         const data = {
-            date: text.match(/(\d{1,2})\.(\d{1,2})/)?.[0] || '',
-            time: text.match(/(\d{1,2})[.:](\d{2})/)?.[0] || '',
-            from: findLineAfter('Lähtö'),
-            to: findLineAfter('Meno'),
-            customer: findLineAfter('Nimi:'),
-            phone: text.match(/\+\d{10,15}/)?.[0] || '',
+            date: text.match(/(\d{1,2})\.(\d{1,2})/)?.[0] || '—',
+            time: text.match(/(\d{1,2})[.:](\d{2})/)?.[0] || '—',
+            from: getNextLine('Lähtö'),
+            to: getNextLine('Meno'),
+            customer: getValueAfter('Nimi'),
+            phone: text.match(/\+?\d{8,15}/)?.[0] || '—',
             price: text.match(/(\d+)\s*[e€]/i)?.[1] || '0',
             type: text.toLowerCase().includes('vip') ? 'VIP' : 'Normaali',
-            notes: lines.find(l => l.toLowerCase().includes('kuuluu odotusta')) || '',
-            billing: findLineAfter('Laskulle'),
-            booker: findLineAfter('Tilaaja'),
+            notes: lines.find(l => l.toLowerCase().includes('odotusta')) || '—',
+            billing: getNextLine('Laskulle'),
+            booker: getNextLine('Tilaaja'),
             createdAt: new Date()
         };
 
@@ -149,19 +39,5 @@
         document.getElementById('msgInput').value = '';
     };
 
-    document.getElementById('btnExport').onclick = () => {
-        if(currentLogs.length === 0) return;
-        // Excel-yhteensopiva CSV
-        let csv = "Pvm;Klo;Lahto;Meno;Asiakas;Puhelin;Hinta;Tyyppi;Laskulle;Tilaaja;Huomioita\n";
-        currentLogs.forEach(r => {
-            csv += `"${r.date}";"${r.time}";"${r.from}";"${r.to}";"${r.customer}";"${r.phone}";"${r.price}";"${r.type}";"${r.billing}";"${r.booker}";"${r.notes}"\n`;
-        });
-        const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `kuljetukset_${new Date().toLocaleDateString()}.csv`;
-        link.click();
-    };
+    // ... (Loput skriptistä säilyy samana) ...
 </script>
-</body>
-</html>
