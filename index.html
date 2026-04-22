@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V31.8</title>
+    <title>Kuljetuskirja V31.9</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -15,39 +15,28 @@
         body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 15px; }
         .v-tag { color: var(--muted); font-size: 10px; text-align: center; margin-bottom: 10px; }
         h1 { font-family: 'Syne', sans-serif; font-size: 1.1rem; text-align: center; color: var(--accent); margin-bottom: 20px; text-transform: uppercase; }
-        
         #auth-section { text-align: center; padding: 80px 20px; display: none; }
         .btn-login { background: white; color: black; padding: 18px 30px; border-radius: 50px; font-weight: bold; border: none; cursor: pointer; }
-        
         #app-content { display: none; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 0.7rem; color: var(--muted); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-        
         textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 140px; outline: none; font-size: 0.9rem; }
         .btn-add { background: var(--accent); color: black; width: 100%; padding: 16px; border-radius: 8px; font-weight: bold; border: none; margin-bottom: 10px; cursor: pointer; font-size: 1.1rem; }
         .btn-update { background: var(--edit) !important; color: white !important; }
-        
         .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
         table { width: 100%; border-collapse: collapse; font-size: 0.7rem; min-width: 850px; }
         th { text-align: left; color: var(--accent2); padding: 10px; border-bottom: 1px solid var(--border); background: #222; }
         td { padding: 10px; border-bottom: 1px solid #222; vertical-align: top; }
-
-        /* PÄIVÄEROTIN */
         .day-separator { border-top: 2px solid var(--accent2) !important; }
-        .day-gap { height: 10px; background: var(--bg); }
-
-        /* VÄRITYS */
         .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
         .row-future b, .row-future small { color: #000 !important; }
         .row-past { opacity: 0.5; filter: grayscale(1); }
-        
         .price-text { color: var(--accent); font-weight: bold; }
         .row-future .price-text { color: #000; border: 1px solid #000; padding: 1px 4px; border-radius: 4px; }
-        
         .action-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 5px 10px; }
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 31.8</div>
+    <div class="v-tag">VERSIO 31.9</div>
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
         <button class="btn-login" id="btnLogin">KIRJAUDU GOOGLE-TUNNUKSELLA</button>
@@ -114,30 +103,23 @@
             tbody.innerHTML = '';
             currentLogs = [];
             const now = Date.now();
-            let lastDate = "";
+            let lastDateStr = "";
 
             snapshot.forEach(d => {
                 const r = d.data();
                 currentLogs.push({id: d.id, ...r});
             });
 
-            currentLogs.sort((a, b) => {
-                const valA = a.driveTimestamp || (a.createdAt ? a.createdAt.toMillis() : 0);
-                const valB = b.driveTimestamp || (b.createdAt ? b.createdAt.toMillis() : 0);
-                return valB - valA;
-            });
+            // Tiukka lajittelu aikaleiman mukaan (tulevat ensin, sitten menneet)
+            currentLogs.sort((a, b) => (b.driveTimestamp || 0) - (a.driveTimestamp || 0));
 
             currentLogs.forEach(r => {
                 const isFuture = (r.driveTimestamp || 0) > now;
                 const rowClass = isFuture ? 'row-future' : 'row-past';
                 
-                // Tarkistetaan päivän vaihtuminen viivaa varten
-                const currentDate = r.date || "";
-                let separatorClass = "";
-                if (lastDate !== "" && currentDate !== lastDate) {
-                    separatorClass = "day-separator";
-                }
-                lastDate = currentDate;
+                const currentDateStr = r.date || "";
+                let separatorClass = (lastDateStr !== "" && currentDateStr !== lastDateStr) ? "day-separator" : "";
+                lastDateStr = currentDateStr;
 
                 const tr = document.createElement('tr');
                 tr.className = `${rowClass} ${separatorClass}`;
@@ -180,25 +162,13 @@
         const getSmartVal = (keywords) => {
             const i = lines.findIndex(l => keywords.some(k => l.toLowerCase().includes(k.toLowerCase())));
             if (i === -1) return '—';
-            if (lines[i].includes(':')) return lines[i].split(':').slice(1).join(':').trim();
-            return lines[i+1] || '—';
+            return lines[i].includes(':') ? lines[i].split(':').slice(1).join(':').trim() : (lines[i+1] || '—');
         };
 
-        // Lennonnumeron haku (Esim AY123, DY 1234, SK123)
-        const flightMatch = text.match(/([A-Z]{2}\s?\d{1,4})/i);
-        
-        const phoneMatch = text.match(/(\+?\d[\d\s]{6,14}\d)/);
-        const priceMatch = text.match(/(\d+)\s*[e€]/i);
-        
-        let nouto = getSmartVal(['Lähtö', 'Nouto', 'Noutopaikka']);
-        
-        // Jos noutoa ei löytynyt avainsanalla, mutta lento löytyi, käytetään lentoa
-        if ((nouto === '—' || !nouto) && flightMatch) {
-            nouto = "Lento: " + flightMatch[0].toUpperCase();
-        }
-
+        const flightMatch = text.match(/([A-Z]{2,3}\s?\d{1,4})/i);
         const dateMatch = text.match(/(\d{1,2})\.(\d{1,2})/);
         const timeMatch = text.match(/(\d{1,2})[.:](\d{2})/);
+
         let driveDate = new Date();
         if (text.toLowerCase().includes('huomenna')) driveDate.setDate(driveDate.getDate() + 1);
         if (dateMatch) { 
@@ -207,17 +177,17 @@
         }
         if (timeMatch) driveDate.setHours(parseInt(timeMatch[1]), parseInt(timeMatch[2]), 0);
 
-        let customerRaw = getSmartVal(['Nimi', 'Kyytiin', 'Matkustaja']);
-        let customerClean = customerRaw.replace(/(\+?\d[\d\s]{6,14}\d)/, '').trim();
+        let nouto = getSmartVal(['Lähtö', 'Nouto', 'Noutopaikka']);
+        if ((nouto === '—' || !nouto) && flightMatch) nouto = "Lento: " + flightMatch[0].toUpperCase();
 
         const data = {
             date: dateMatch ? dateMatch[0] : (text.toLowerCase().includes('huomenna') ? 'Huomenna' : 'Tänään'),
             time: timeMatch ? timeMatch[0] : '—',
             from: nouto,
             to: getSmartVal(['Meno', 'Kohde', 'Määränpää']),
-            customer: customerClean,
-            phone: phoneMatch ? phoneMatch[0] : '—',
-            price: priceMatch ? priceMatch[1] : '0',
+            customer: getSmartVal(['Nimi', 'Kyytiin', 'Matkustaja']).replace(/(\+?\d[\d\s]{6,14}\d)/, '').trim(),
+            phone: text.match(/(\+?\d[\d\s]{6,14}\d)/)?.[0] || '—',
+            price: text.match(/(\d+)\s*[e€]/i)?.[1] || '0',
             type: text.toLowerCase().includes('vip') ? 'VIP' : 'Normaali',
             notes: lines.find(l => l.toLowerCase().includes('odotus') || l.toLowerCase().includes('huomio')) || '—',
             billing: getSmartVal(['Laskulle', 'Maksutapa']),
