@@ -8,52 +8,47 @@
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #888; --danger: #f05050; }
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px; overflow-x: hidden; }
-        #auth-section { text-align: center; padding-top: 20vh; display: block; }
+        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px; }
+        #auth-section { text-align: center; padding-top: 15vh; }
         #app-content { display: none; }
-        h1 { font-family: 'Syne', sans-serif; font-size: 1.8rem; color: var(--accent); text-transform: uppercase; margin-bottom: 10px; }
-        .btn-login { background: #fff; color: #000; padding: 18px 30px; border-radius: 12px; font-weight: 800; font-size: 1rem; border: none; width: 100%; max-width: 300px; margin-top: 20px; box-shadow: 0 4px 15px rgba(255,255,255,0.1); }
+        h1 { font-family: 'Syne', sans-serif; font-size: 1.8rem; color: var(--accent); margin-bottom: 5px; }
+        .btn-login { background: #fff; color: #000; padding: 18px 30px; border-radius: 12px; font-weight: 800; font-size: 1rem; border: none; width: 100%; max-width: 300px; margin-top: 20px; cursor: pointer; }
         .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 20px; }
         textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--text); padding: 15px; min-height: 150px; outline: none; font-size: 16px; margin-bottom: 15px; resize: none; }
         .btn-primary { background: var(--accent); color: #000; width: 100%; padding: 15px; border-radius: 12px; font-weight: 700; font-size: 1rem; border: none; }
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         th { text-align: left; color: var(--accent2); padding: 12px 8px; border-bottom: 1px solid var(--border); }
-        td { padding: 12px 8px; border-bottom: 1px solid #222; vertical-align: top; }
-        .status-msg { font-size: 0.8rem; color: var(--muted); margin-top: 10px; }
+        td { padding: 12px 8px; border-bottom: 1px solid #222; }
     </style>
 </head>
 <body>
 
 <div id="auth-section">
     <h1>KULJETUSKIRJA</h1>
-    <p style="color: var(--muted);">Hallinnoi ajoja iPadilla</p>
-    <button class="btn-login" id="btnLogin">KIRJAUDU GOOGLELLA</button>
-    <p id="auth-status" class="status-msg">Odotetaan kirjautumista...</p>
+    <p style="color: var(--muted);">Kirjaudu sisään iPadilla</p>
+    <button class="btn-login" id="btnLogin">KIRJAUDU TÄSTÄ</button>
+    <p id="status" style="margin-top:20px; font-size:0.8rem; color:var(--muted);"></p>
 </div>
 
 <div id="app-content">
     <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h1>KIRJA</h1>
+        <h1 style="font-size:1.2rem;">KIRJA</h1>
         <button id="btnLogout" style="background:none; color:var(--muted); border:1px solid var(--border); padding:5px 10px; border-radius:8px; font-size:0.7rem;">ULOS</button>
     </header>
-
     <div class="card">
-        <textarea id="msgInput" placeholder="Liitä WhatsApp-keikka tähän..."></textarea>
-        <button class="btn-primary" id="btnAdd">LISÄÄ TIETOKANTAAN</button>
+        <textarea id="msgInput" placeholder="Liitä viesti..."></textarea>
+        <button class="btn-primary" id="btnAdd">LISÄÄ LISTAAN</button>
     </div>
-
-    <div style="overflow-x: auto;">
-        <table>
-            <thead><tr><th>Klo</th><th>Reitti</th><th>€</th><th></th></tr></thead>
-            <tbody id="tbody"></tbody>
-        </table>
-    </div>
+    <table>
+        <thead><tr><th>Klo</th><th>Reitti</th><th>€</th></tr></thead>
+        <tbody id="tbody"></tbody>
+    </table>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyB7Dp5_5fN0Iko-4Jn1D2Dp6NNNih63U0O",
@@ -69,198 +64,50 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    // iPad-korjaus: Tarkistetaan onko palattu kirjautumisesta
-    getRedirectResult(auth).catch((error) => {
-        document.getElementById('auth-status').innerText = "Virhe: " + error.message;
-    });
-
-    document.getElementById('btnLogin').onclick = () => {
-        document.getElementById('auth-status').innerText = "Siirrytään Googleen...";
-        signInWithRedirect(auth, provider);
+    // Käytetään Popupia, joka on usein varmempi iPadin "jumittumista" vastaan
+    document.getElementById('btnLogin').onclick = async () => {
+        document.getElementById('status').innerText = "Avataan kirjautumisikkuna...";
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (e) {
+            document.getElementById('status').innerText = "Virhe: Salli ponnahdusikkunat asetuksista.";
+            console.error(e);
+        }
     };
-    
+
     document.getElementById('btnLogout').onclick = () => signOut(auth);
 
     onAuthStateChanged(auth, (user) => {
         if (user && user.email === "jacke.seilaa@gmail.com") {
             document.getElementById('auth-section').style.display = 'none';
             document.getElementById('app-content').style.display = 'block';
-            startListening();
-        } else if (user) {
-            alert("Ei oikeuksia: " + user.email);
-            signOut(auth);
+            loadData();
         }
     });
 
-    function startListening() {
+    function loadData() {
         const q = query(collection(db, "taksitulot"), orderBy("createdAt", "desc"));
         onSnapshot(q, (snapshot) => {
             const tbody = document.getElementById('tbody');
             tbody.innerHTML = '';
             snapshot.forEach(d => {
                 const r = d.data();
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${r.time || ''}</td>
-                    <td><div style="font-size:0.7rem; color:var(--muted)">${r.from}</div>${r.to}</td>
-                    <td style="color:var(--accent); font-weight:bold;">${r.price}€</td>
-                    <td><button onclick="window.del('${d.id}')" style="background:none; color:var(--danger); border:none; padding:5px;">✕</button></td>
-                `;
-                tbody.appendChild(tr);
+                tbody.innerHTML += `<tr><td>${r.time||''}</td><td>${r.to||''}</td><td>${r.price}€</td></tr>`;
             });
         });
     }
 
     document.getElementById('btnAdd').onclick = async () => {
         const text = document.getElementById('msgInput').value;
-        if(!text) return;
-        const lines = text.split('\n').map(l => l.trim());
         const data = {
-            date: text.match(/(\d{1,2})\.(\d{1,2})/)?.[0] || new Date().toLocaleDateString('fi-FI'),
             time: text.match(/(\d{1,2})[.:](\d{2})/)?.[0] || '',
-            from: lines.find(l => l.toLowerCase().includes('lähtö'))?.replace(/lähtö/i, '').trim() || '?',
-            to: lines.find(l => l.toLowerCase().includes('meno') || l.toLowerCase().includes('kohde'))?.replace(/meno|kohde/i, '').trim() || '?',
+            to: text.split('\n')[2] || '?',
             price: text.match(/(\d+)\s*[€eE]/)?.[1] || '0',
             createdAt: new Date()
         };
         await addDoc(collection(db, "taksitulot"), data);
         document.getElementById('msgInput').value = '';
     };
-
-    window.del = (id) => confirm("Poistetaanko?") && deleteDoc(doc(db, "taksitulot", id));
-</script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="fi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
-    <style>
-        :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #888; --danger: #f05050; }
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px; overflow-x: hidden; }
-        #auth-section { text-align: center; padding-top: 20vh; display: block; }
-        #app-content { display: none; }
-        h1 { font-family: 'Syne', sans-serif; font-size: 1.8rem; color: var(--accent); text-transform: uppercase; margin-bottom: 10px; }
-        .btn-login { background: #fff; color: #000; padding: 18px 30px; border-radius: 12px; font-weight: 800; font-size: 1rem; border: none; width: 100%; max-width: 300px; margin-top: 20px; box-shadow: 0 4px 15px rgba(255,255,255,0.1); }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 20px; }
-        textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--text); padding: 15px; min-height: 150px; outline: none; font-size: 16px; margin-bottom: 15px; resize: none; }
-        .btn-primary { background: var(--accent); color: #000; width: 100%; padding: 15px; border-radius: 12px; font-weight: 700; font-size: 1rem; border: none; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        th { text-align: left; color: var(--accent2); padding: 12px 8px; border-bottom: 1px solid var(--border); }
-        td { padding: 12px 8px; border-bottom: 1px solid #222; vertical-align: top; }
-        .status-msg { font-size: 0.8rem; color: var(--muted); margin-top: 10px; }
-    </style>
-</head>
-<body>
-
-<div id="auth-section">
-    <h1>KULJETUSKIRJA</h1>
-    <p style="color: var(--muted);">Hallinnoi ajoja iPadilla</p>
-    <button class="btn-login" id="btnLogin">KIRJAUDU GOOGLELLA</button>
-    <p id="auth-status" class="status-msg">Odotetaan kirjautumista...</p>
-</div>
-
-<div id="app-content">
-    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h1>KIRJA</h1>
-        <button id="btnLogout" style="background:none; color:var(--muted); border:1px solid var(--border); padding:5px 10px; border-radius:8px; font-size:0.7rem;">ULOS</button>
-    </header>
-
-    <div class="card">
-        <textarea id="msgInput" placeholder="Liitä WhatsApp-keikka tähän..."></textarea>
-        <button class="btn-primary" id="btnAdd">LISÄÄ TIETOKANTAAN</button>
-    </div>
-
-    <div style="overflow-x: auto;">
-        <table>
-            <thead><tr><th>Klo</th><th>Reitti</th><th>€</th><th></th></tr></thead>
-            <tbody id="tbody"></tbody>
-        </table>
-    </div>
-</div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyB7Dp5_5fN0Iko-4Jn1D2Dp6NNNih63U0O",
-        authDomain: "jsailing-f716c.firebaseapp.com",
-        projectId: "jsailing-f716c",
-        storageBucket: "jsailing-f716c.firebasestorage.app",
-        messagingSenderId: "543523103696",
-        appId: "1:543523103696:web:439a312efa6aec398a8fd5"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-
-    // iPad-korjaus: Tarkistetaan onko palattu kirjautumisesta
-    getRedirectResult(auth).catch((error) => {
-        document.getElementById('auth-status').innerText = "Virhe: " + error.message;
-    });
-
-    document.getElementById('btnLogin').onclick = () => {
-        document.getElementById('auth-status').innerText = "Siirrytään Googleen...";
-        signInWithRedirect(auth, provider);
-    };
-    
-    document.getElementById('btnLogout').onclick = () => signOut(auth);
-
-    onAuthStateChanged(auth, (user) => {
-        if (user && user.email === "jacke.seilaa@gmail.com") {
-            document.getElementById('auth-section').style.display = 'none';
-            document.getElementById('app-content').style.display = 'block';
-            startListening();
-        } else if (user) {
-            alert("Ei oikeuksia: " + user.email);
-            signOut(auth);
-        }
-    });
-
-    function startListening() {
-        const q = query(collection(db, "taksitulot"), orderBy("createdAt", "desc"));
-        onSnapshot(q, (snapshot) => {
-            const tbody = document.getElementById('tbody');
-            tbody.innerHTML = '';
-            snapshot.forEach(d => {
-                const r = d.data();
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${r.time || ''}</td>
-                    <td><div style="font-size:0.7rem; color:var(--muted)">${r.from}</div>${r.to}</td>
-                    <td style="color:var(--accent); font-weight:bold;">${r.price}€</td>
-                    <td><button onclick="window.del('${d.id}')" style="background:none; color:var(--danger); border:none; padding:5px;">✕</button></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        });
-    }
-
-    document.getElementById('btnAdd').onclick = async () => {
-        const text = document.getElementById('msgInput').value;
-        if(!text) return;
-        const lines = text.split('\n').map(l => l.trim());
-        const data = {
-            date: text.match(/(\d{1,2})\.(\d{1,2})/)?.[0] || new Date().toLocaleDateString('fi-FI'),
-            time: text.match(/(\d{1,2})[.:](\d{2})/)?.[0] || '',
-            from: lines.find(l => l.toLowerCase().includes('lähtö'))?.replace(/lähtö/i, '').trim() || '?',
-            to: lines.find(l => l.toLowerCase().includes('meno') || l.toLowerCase().includes('kohde'))?.replace(/meno|kohde/i, '').trim() || '?',
-            price: text.match(/(\d+)\s*[€eE]/)?.[1] || '0',
-            createdAt: new Date()
-        };
-        await addDoc(collection(db, "taksitulot"), data);
-        document.getElementById('msgInput').value = '';
-    };
-
-    window.del = (id) => confirm("Poistetaanko?") && deleteDoc(doc(db, "taksitulot", id));
 </script>
 </body>
 </html>
