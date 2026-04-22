@@ -3,38 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V9</title>
+    <title>Kuljetuskirja V10</title>
     <style>
-        body { background: #0f0f0f; color: #fff; font-family: -apple-system, sans-serif; text-align: center; padding-top: 10vh; margin: 0; }
-        .version-badge { background: #c8f050; color: #000; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; display: inline-block; margin-bottom: 20px; }
+        body { background: #0b0b0b; color: #fff; font-family: -apple-system, sans-serif; text-align: center; padding-top: 10vh; margin: 0; }
+        .v-badge { background: #ff4757; color: #fff; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; display: inline-block; margin-bottom: 20px; }
         .container { padding: 20px; max-width: 400px; margin: auto; }
         .btn { 
             display: none; padding: 25px; border-radius: 50px; width: 100%; 
             font-weight: 900; font-size: 1.4rem; border: 4px solid #c8f050; cursor: pointer;
-            text-transform: uppercase; margin: 20px auto;
+            text-transform: uppercase; margin: 20px auto; transition: 0.2s;
         }
         #startBtn { background: #fff; color: #000; }
         #finalLink { background: #c8f050; color: #000; border-color: #fff; }
-        #status { color: #c8f050; margin-top: 20px; font-weight: bold; min-height: 1.5em; }
+        #status { color: #c8f050; margin-top: 20px; font-weight: bold; min-height: 1.5em; text-transform: uppercase; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="version-badge">VERSIO 9.0</div>
+    <div class="v-badge">VERSIO 10.0</div>
     <h1 style="color: #c8f050; font-size: 2.2rem; margin: 0;">KULJETUSKIRJA</h1>
     
-    <div id="status">Ladataan järjestelmää...</div>
+    <div id="status">Alustetaan...</div>
 
     <button id="startBtn" class="btn">KIRJAUDU SISÄÄN</button>
     <button id="finalLink" class="btn">AVAA TAKSITILAUKSET</button>
 
-    <div id="userEmail" style="color:#666; margin-top:10px; font-size: 0.8rem;"></div>
+    <div id="uEmail" style="color:#444; margin-top:20px; font-size: 0.8rem;"></div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
@@ -48,46 +48,42 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
+    
+    // Pakotetaan tilin valinta, jotta Safari ei "ohita" prosessia
+    provider.setCustomParameters({ prompt: 'select_account' });
 
     const sBtn = document.getElementById('startBtn');
     const fBtn = document.getElementById('finalLink');
     const stat = document.getElementById('status');
 
-    // 1. Yritä hakea redirect-tulos jos ikkuna "välähti" ja palasi
-    getRedirectResult(auth).catch((error) => {
-        console.error("Redirect-virhe:", error);
-        if (error.code === 'auth/cross-origin-isolated-biometric-id-not-allowed') {
-            stat.innerText = "Safari estää kirjautumisen. Tarkista asetukset.";
-        }
-    });
-
-    // 2. Seuraa tilaa
+    // Seuraa kirjautumistilaa
     onAuthStateChanged(auth, (user) => {
         if (user) {
+            console.log("Käyttäjä löytyi:", user.email);
             if (user.email === "jacke.seilaa@gmail.com") {
-                stat.innerText = "TERVETULOA JACKE";
+                stat.innerText = "PÄÄSY SALLITTU";
                 sBtn.style.display = "none";
                 fBtn.style.display = "block";
-                document.getElementById('userEmail').innerText = "Kirjautuneena: " + user.email;
+                document.getElementById('uEmail').innerText = user.email;
             } else {
-                stat.innerText = "EI PÄÄSYÄ: " + user.email;
-                sBtn.style.display = "block";
-                fBtn.style.display = "none";
+                stat.innerText = "EI PÄÄSYÄ";
+                signOut(auth);
             }
         } else {
-            stat.innerText = "Vaatii tunnistautumisen";
+            stat.innerText = "VAATII TUNNISTAUTUMISEN";
             sBtn.style.display = "block";
             fBtn.style.display = "none";
         }
     });
 
-    // 3. Kirjautuminen (Redirect on iPadilla vakain)
+    // Kirjautumisnappi
     sBtn.onclick = () => {
-        stat.innerText = "Avataan Google...";
+        stat.innerText = "YHDISTETÄÄN GOOGLEEN...";
+        // Käytetään redirectia
         signInWithRedirect(auth, provider);
     };
 
-    // 4. Siirtyminen
+    // Siirtyminen
     fBtn.onclick = () => {
         window.location.href = "https://jackeseilaa.github.io/taksitilaukset/";
     };
