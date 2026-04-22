@@ -3,46 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V11</title>
+    <title>Kuljetuskirja V12</title>
     <style>
-        body { background: #0b0b0b; color: #fff; font-family: -apple-system, sans-serif; text-align: center; padding-top: 10vh; margin: 0; }
-        .v-badge { background: #009432; color: #fff; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; display: inline-block; margin-bottom: 20px; }
-        .container { padding: 20px; max-width: 400px; margin: auto; }
+        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding-top: 20vh; margin: 0; }
+        .container { padding: 20px; }
+        .v-badge { background: #333; color: #eee; padding: 4px 10px; border-radius: 10px; font-size: 12px; margin-bottom: 20px; display: inline-block; }
         
-        /* Napit */
+        /* Napit pidetään täysin erillään */
+        #login-section, #auth-section { display: none; }
+
         .btn { 
-            display: none; padding: 25px; border-radius: 50px; width: 100%; 
-            font-weight: 900; font-size: 1.4rem; border: 4px solid #c8f050; cursor: pointer;
-            text-transform: uppercase; margin: 20px auto; text-decoration: none; box-sizing: border-box;
+            display: block; padding: 25px; border-radius: 50px; width: 100%; max-width: 320px;
+            font-weight: 900; font-size: 1.4rem; cursor: pointer;
+            text-transform: uppercase; margin: 20px auto; text-decoration: none;
         }
-        #startBtn { background: #fff; color: #000; }
+        .white { background: #fff; color: #000; border: 4px solid #c8f050; }
+        .green { background: #c8f050; color: #000; border: 4px solid #fff; }
         
-        /* Vihreä nappi on nyt suora linkki-elementti <a> */
-        #finalLink { 
-            background: #c8f050; color: #000; border-color: #fff; display: none; 
-        }
-        
-        #status { color: #c8f050; margin-top: 20px; font-weight: bold; text-transform: uppercase; }
+        #status { color: #c8f050; font-weight: bold; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="v-badge">VERSIO 11.0</div>
-    <h1 style="color: #c8f050; font-size: 2.2rem; margin: 0;">KULJETUSKIRJA</h1>
+    <div class="v-badge">VERSIO 12.0</div>
     
-    <div id="status">Tarkistetaan...</div>
+    <div id="status">Ladataan...</div>
 
-    <button id="startBtn" class="btn">KIRJAUDU SISÄÄN</button>
+    <div id="login-section">
+        <h1 style="color:#fff;">KULJETUSKIRJA</h1>
+        <button id="startBtn" class="btn white">KIRJAUDU SISÄÄN</button>
+    </div>
 
-    <a id="finalLink" href="https://jackeseilaa.github.io/taksitilaukset/" class="btn">AVAA TAKSITILAUKSET</a>
-
-    <div id="uEmail" style="color:#444; margin-top:20px; font-size: 0.8rem;"></div>
+    <div id="auth-section">
+        <h1 style="color:#c8f050;">PÄÄSY SALLITTU</h1>
+        <a href="https://jackeseilaa.github.io/taksitilaukset/" class="btn green">AVAA TAKSITILAUKSET</a>
+        <p id="userMail" style="color:#555; font-size:12px;"></p>
+        <button onclick="signOutNow()" style="background:none; border:none; color:#333; margin-top:50px; text-decoration:underline;">Kirjaudu ulos</button>
+    </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
@@ -57,109 +60,35 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    const sBtn = document.getElementById('startBtn');
-    const fBtn = document.getElementById('finalLink');
+    const logSec = document.getElementById('login-section');
+    const authSec = document.getElementById('auth-section');
     const stat = document.getElementById('status');
 
+    // SEURANTA
     onAuthStateChanged(auth, (user) => {
+        stat.style.display = "none"; // Piilota "Ladataan"
+
         if (user && user.email === "jacke.seilaa@gmail.com") {
-            stat.innerText = "PÄÄSY SALLITTU";
-            sBtn.style.display = "none";
-            fBtn.style.display = "block"; // Näyttää linkin nappina
-            document.getElementById('uEmail').innerText = user.email;
+            logSec.style.display = "none";
+            authSec.style.display = "block";
+            document.getElementById('userMail').innerText = user.email;
         } else {
-            stat.innerText = "VAATII TUNNISTAUTUMISEN";
-            sBtn.style.display = "block";
-            fBtn.style.display = "none";
+            logSec.style.display = "block";
+            authSec.style.display = "none";
+            if(user) signOut(auth); // Jos väärä käyttäjä, ulos.
         }
     });
 
-    sBtn.onclick = () => {
-        stat.innerText = "YHDISTETÄÄN...";
+    // KIRJAUTUMINEN
+    document.getElementById('startBtn').onclick = () => {
+        stat.style.display = "block";
+        stat.innerText = "YHDISTETÄÄN GOOGLEEN...";
         signInWithRedirect(auth, provider);
     };
-</script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="fi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V11</title>
-    <style>
-        body { background: #0b0b0b; color: #fff; font-family: -apple-system, sans-serif; text-align: center; padding-top: 10vh; margin: 0; }
-        .v-badge { background: #009432; color: #fff; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; display: inline-block; margin-bottom: 20px; }
-        .container { padding: 20px; max-width: 400px; margin: auto; }
-        
-        /* Napit */
-        .btn { 
-            display: none; padding: 25px; border-radius: 50px; width: 100%; 
-            font-weight: 900; font-size: 1.4rem; border: 4px solid #c8f050; cursor: pointer;
-            text-transform: uppercase; margin: 20px auto; text-decoration: none; box-sizing: border-box;
-        }
-        #startBtn { background: #fff; color: #000; }
-        
-        /* Vihreä nappi on nyt suora linkki-elementti <a> */
-        #finalLink { 
-            background: #c8f050; color: #000; border-color: #fff; display: none; 
-        }
-        
-        #status { color: #c8f050; margin-top: 20px; font-weight: bold; text-transform: uppercase; }
-    </style>
-</head>
-<body>
 
-<div class="container">
-    <div class="v-badge">VERSIO 11.0</div>
-    <h1 style="color: #c8f050; font-size: 2.2rem; margin: 0;">KULJETUSKIRJA</h1>
-    
-    <div id="status">Tarkistetaan...</div>
-
-    <button id="startBtn" class="btn">KIRJAUDU SISÄÄN</button>
-
-    <a id="finalLink" href="https://jackeseilaa.github.io/taksitilaukset/" class="btn">AVAA TAKSITILAUKSET</a>
-
-    <div id="uEmail" style="color:#444; margin-top:20px; font-size: 0.8rem;"></div>
-</div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
-        authDomain: "jsailing-f716c.firebaseapp.com",
-        projectId: "jsailing-f716c",
-        storageBucket: "jsailing-f716c.firebasestorage.app",
-        messagingSenderId: "543523103696",
-        appId: "1:543523103696:web:439a312efa6aec398a8fd5"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-
-    const sBtn = document.getElementById('startBtn');
-    const fBtn = document.getElementById('finalLink');
-    const stat = document.getElementById('status');
-
-    onAuthStateChanged(auth, (user) => {
-        if (user && user.email === "jacke.seilaa@gmail.com") {
-            stat.innerText = "PÄÄSY SALLITTU";
-            sBtn.style.display = "none";
-            fBtn.style.display = "block"; // Näyttää linkin nappina
-            document.getElementById('uEmail').innerText = user.email;
-        } else {
-            stat.innerText = "VAATII TUNNISTAUTUMISEN";
-            sBtn.style.display = "block";
-            fBtn.style.display = "none";
-        }
-    });
-
-    sBtn.onclick = () => {
-        stat.innerText = "YHDISTETÄÄN...";
-        signInWithRedirect(auth, provider);
+    // ULOSKIRJAUS
+    window.signOutNow = () => {
+        signOut(auth).then(() => location.reload());
     };
 </script>
 </body>
