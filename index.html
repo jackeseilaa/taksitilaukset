@@ -8,19 +8,21 @@
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #888; --danger: #f05050; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px 16px; }
+        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px 16px; display: flex; flex-direction: column; }
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
         h1 { font-family: 'Syne', sans-serif; font-size: 1.8rem; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
         .input-area { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-        textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 12px; min-height: 120px; outline: none; font-family: 'DM Mono', monospace; }
-        button { font-family: 'Syne', sans-serif; font-weight: 600; padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; }
+        textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 12px; min-height: 120px; outline: none; font-family: 'DM Mono', monospace; font-size: 0.9rem; }
+        button { font-family: 'Syne', sans-serif; font-weight: 600; padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; }
         .btn-primary { background: var(--accent); color: #0f0f0f; width: 100%; margin-top: 10px; }
+        .btn-primary:active { transform: scale(0.98); }
         .btn-login { background: white; color: black; padding: 15px 30px; font-size: 1rem; }
         table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 20px; }
         th { text-align: left; color: var(--accent2); padding: 10px; border-bottom: 1px solid var(--border); text-transform: uppercase; }
         td { padding: 10px; border-bottom: 1px solid #222; }
-        #auth-section { text-align: center; padding-top: 100px; }
-        #app-content { display: none; }
+        #auth-section { text-align: center; padding-top: 100px; flex-grow: 1; }
+        #app-content { display: none; flex-grow: 1; }
+        .version-tag { font-size: 0.6rem; color: var(--muted); text-align: center; margin-top: 40px; padding-bottom: 10px; opacity: 0.5; }
     </style>
 </head>
 <body>
@@ -34,32 +36,36 @@
 <div id="app-content">
     <header>
         <h1>Kuljetuskirja</h1>
-        <button id="btnLogout" style="background:none; color:var(--muted); border:1px solid var(--border); font-size:0.7rem;">Kirjaudu ulos</button>
+        <button id="btnLogout" style="background:none; color:var(--muted); border:1px solid var(--border); font-size:0.7rem; padding: 4px 8px;">Kirjaudu ulos</button>
     </header>
 
     <div class="input-area">
         <textarea id="msgInput" placeholder="Liitä WhatsApp-viesti tähän..."></textarea>
-        <button class="btn-primary" id="btnAdd">➕ Lisää listaan</button>
+        <button class="btn-primary" id="btnAdd">➕ LISÄÄ LISTAAN</button>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Pvm</th>
-                <th>Klo</th>
-                <th>Reitti</th>
-                <th>Hinta</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-    </table>
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Pvm</th>
+                    <th>Klo</th>
+                    <th>Reitti</th>
+                    <th>Hinta</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+    </div>
 </div>
+
+<div class="version-tag">Versio 1.0.1 (Redirect Auth)</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getAuth, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyB7Dp5_5fN0Iko-4Jn1D2Dp6NNNih63U0O",
@@ -75,9 +81,14 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    // KIRJAUDU SISÄÄN (Redirect-malli korjaa välähtämisen)
+    // Kirjautumisen käsittely
     document.getElementById('btnLogin').onclick = () => signInWithRedirect(auth, provider);
     document.getElementById('btnLogout').onclick = () => signOut(auth);
+
+    // Tarkistetaan paluu kirjautumisesta
+    getRedirectResult(auth).catch((error) => {
+        console.error("Kirjautumisvirhe:", error);
+    });
 
     onAuthStateChanged(auth, (user) => {
         if (user && user.email === "jacke.seilaa@gmail.com") {
@@ -85,8 +96,11 @@
             document.getElementById('app-content').style.display = 'block';
             startListening();
         } else if (user) {
-            alert("Pääsy kielletty: " + user.email);
+            alert("Pääsy kielletty sähköpostilla: " + user.email);
             signOut(auth);
+        } else {
+            document.getElementById('auth-section').style.display = 'block';
+            document.getElementById('app-content').style.display = 'none';
         }
     });
 
@@ -99,11 +113,11 @@
                 const r = d.data();
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${r.date}</td>
-                    <td>${r.time}</td>
-                    <td><div style="color:var(--muted); font-size:0.7rem;">${r.from}</div>${r.to}</td>
-                    <td style="color:var(--accent)">${r.price}€</td>
-                    <td><button onclick="window.del('${d.id}')" style="background:none; color:var(--danger)">✕</button></td>
+                    <td>${r.date || '-'}</td>
+                    <td>${r.time || '-'}</td>
+                    <td><div style="color:var(--muted); font-size:0.7rem;">${r.from || '?'}</div>${r.to || '?'}</td>
+                    <td style="color:var(--accent)">${r.price || '0'}€</td>
+                    <td><button onclick="window.del('${d.id}')" style="background:none; color:var(--danger); border:none; cursor:pointer;">✕</button></td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -112,21 +126,31 @@
 
     document.getElementById('btnAdd').onclick = async () => {
         const text = document.getElementById('msgInput').value;
-        if(!text) return;
+        if(!text.trim()) return;
+
         const lines = text.split('\n').map(l => l.trim());
         const data = {
             date: text.match(/(\d{1,2})\.(\d{1,2})/)?.[0] || '',
-            time: text.match(/(\d{1,2})[.:](\d{2})/)?.[0] || '',
-            from: lines.find(l => l.toLowerCase().includes('lähtö'))?.replace(/lähtö/i, '').trim() || '?',
-            to: lines.find(l => l.toLowerCase().includes('meno') || l.toLowerCase().includes('kohde'))?.replace(/meno|kohde/i, '').trim() || '?',
+            time: text.match(/(\d{1,2})[.:](\d{2})/)?.[1] ? text.match(/(\d{1,2})[.:](\d{2})/)?.[0] : '',
+            from: lines.find(l => l.toLowerCase().includes('lähtö'))?.replace(/lähtö:?/i, '').trim() || '?',
+            to: lines.find(l => l.toLowerCase().includes('meno') || l.toLowerCase().includes('kohde'))?.replace(/meno:?|kohde:?/i, '').trim() || '?',
             price: text.match(/(\d+)\s*[€eE]/)?.[1] || '0',
             createdAt: new Date()
         };
-        await addDoc(collection(db, "taksitulot"), data);
-        document.getElementById('msgInput').value = '';
+
+        try {
+            await addDoc(collection(db, "taksitulot"), data);
+            document.getElementById('msgInput').value = '';
+        } catch (e) {
+            alert("Tallennus epäonnistui. Tarkista oikeudet.");
+        }
     };
 
-    window.del = (id) => confirm("Poistetaanko?") && deleteDoc(doc(db, "taksitulot", id));
+    window.del = (id) => {
+        if(confirm("Poistetaanko tämä ajo?")) {
+            deleteDoc(doc(db, "taksitulot", id));
+        }
+    };
 </script>
 </body>
 </html>
