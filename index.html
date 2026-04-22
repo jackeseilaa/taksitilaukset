@@ -3,29 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V14 - AUTO</title>
+    <title>V15 - STOP LOOP</title>
     <style>
-        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding-top: 20vh; }
-        .v { color: #333; font-size: 12px; }
-        #msg { color: #c8f050; font-size: 1.5rem; font-weight: bold; }
-        .loading-bar { width: 100px; height: 4px; background: #c8f050; margin: 20px auto; animation: load 2s infinite; }
-        @keyframes load { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
+        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding-top: 10vh; }
+        .box { border: 2px solid #333; padding: 20px; margin: 20px; border-radius: 15px; }
+        .btn { 
+            display: block; width: 100%; max-width: 300px; margin: 20px auto; 
+            padding: 20px; border-radius: 50px; font-weight: bold; font-size: 1.2rem;
+            text-decoration: none; cursor: pointer;
+        }
+        .login { background: #fff; color: #000; }
+        .go { background: #c8f050; color: #000; }
+        #status { color: #c8f050; font-weight: bold; margin: 20px; }
     </style>
 </head>
 <body>
-    <div class="v">VERSIO 14.0 (AUTO-JUMP)</div>
-    <div id="msg">TARKISTETAAN PÄÄSYÄ...</div>
-    <div class="loading-bar"></div>
+    <div style="color:#444; font-size:12px;">VERSIO 15.0</div>
+    
+    <div class="box">
+        <div id="status">ODOTTAA TOIMENPIDETTÄ</div>
+        
+        <div id="login-part">
+            <button onclick="doLogin()" class="btn login">1. KIRJAUDU SISÄÄN</button>
+        </div>
 
-    <div id="manual" style="display:none; margin-top:50px;">
-        <button onclick="location.href='https://jackeseilaa.github.io/taksitilaukset/'" style="padding:20px; background:#fff; border-radius:10px;">
-            KLIKKAA TÄSTÄ JOS EI SIIRRY
-        </button>
+        <div id="auth-part" style="display:none;">
+            <h2 style="color:#c8f050;">TUNNISTETTU!</h2>
+            <a href="https://jackeseilaa.github.io/taksitilaukset/" class="btn go">2. AVAA TAKSITILAUKSET</a>
+        </div>
     </div>
+
+    <button onclick="doLogout()" style="background:none; border:none; color:#222; margin-top:50px; text-decoration:underline;">
+        Nollaa istunto (Uloskirjaus)
+    </button>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
@@ -41,23 +55,24 @@
 
     onAuthStateChanged(auth, (user) => {
         if (user && user.email === "jacke.seilaa@gmail.com") {
-            document.getElementById('msg').innerText = "TERVETULOA. SIIRRYTÄÄN...";
-            // PAKOTETTU SIIRTO
-            window.location.replace("https://jackeseilaa.github.io/taksitilaukset/");
-            
-            // Varmistus jos replace pettää
-            setTimeout(() => {
-                window.location.href = "https://jackeseilaa.github.io/taksitilaukset/";
-                document.getElementById('manual').style.display = "block";
-            }, 1000);
-            
-        } else if (!user) {
-            document.getElementById('msg').innerText = "KIRJAUDUTAAN SISÄÄN...";
-            signInWithRedirect(auth, new GoogleAuthProvider());
+            document.getElementById('status').innerText = "KIRJAUTUMINEN OK";
+            document.getElementById('auth-part').style.display = "block";
+            document.getElementById('login-part').style.display = "none";
         } else {
-            document.getElementById('msg').innerText = "EI PÄÄSYÄ.";
+            document.getElementById('status').innerText = "EI TUNNISTETTU";
+            document.getElementById('auth-part').style.display = "none";
+            document.getElementById('login-part').style.display = "block";
         }
     });
+
+    window.doLogin = () => {
+        const provider = new GoogleAuthProvider();
+        signInWithRedirect(auth, provider);
+    };
+
+    window.doLogout = () => {
+        signOut(auth).then(() => location.reload());
+    };
 </script>
 </body>
 </html>
