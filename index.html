@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="fi">
 <head>
     <meta charset="UTF-8">
@@ -20,18 +19,16 @@
 </head>
 <body>
 
-```
 <h1 style="color: #c8f050; font-size: 2.5rem;">KULJETUSKIRJA</h1>
 <p style="margin-bottom: 40px;">iPad-yhteys varmistettu</p>
 
 <button id="startBtn" class="btn-fix">KIRJAUDU TÄSTÄ</button>
 
 <div id="status">Tila: Odottaa klikkausta</div>
-```
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyB7Dp5_5fN0Iko-4Jn1D2Dp6NNNih63U0O",
@@ -46,68 +43,44 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    // KRIITTISET ASETUKSET:
-    // 1. Pakotetaan Google kysymään tiliä
     provider.setCustomParameters({ 
-        prompt: 'select_account',
-        // Safari-yhteensopivuus: kerro Google että hyväksyt popup-redirect
-        access_type: 'online'
+        prompt: 'select_account'
     });
 
-    // 2. Tarkistetaan heti onko tultu redirect-palautuksesta
-    document.getElementById('status').innerText = "Tarkistetaan kirjautumista...";
-    
-    getRedirectResult(auth)
-        .then((result) => {
-            if (result && result.user) {
-                // Onnistunut redirect-palautus
-                console.log("Redirect-palautus onnistui:", result.user.email);
-                handleUserLogin(result.user);
-            } else {
-                // Ei redirect-palautusta, ollaan normaalilla sivulla
-                document.getElementById('status').innerText = "Tila: Odottaa klikkausta";
-            }
-        })
-        .catch((error) => {
-            console.error("Redirect-virhe:", error.code, error.message);
-            
-            if (error.code === 'auth/popup-closed-by-user') {
-                document.getElementById('status').innerText = "Kirjautuminen peruutettiin.";
-            } else if (error.code === 'auth/cross-origin-auth-not-integrated-client') {
-                document.getElementById('status').innerText = "⚠️ Safari-ongelma. Kokeile Incognito-tilaa tai toista selainta.";
-            } else {
-                document.getElementById('status').innerText = `Virhe: ${error.message}`;
-            }
-        });
-
-    // 3. Napin klikkaus - TÄYTYY OLLA SAMAN FUNCTION-KUTSUSSA KUIN signInWithRedirect
+    // Napin klikkaus
     document.getElementById('startBtn').onclick = async (e) => {
         e.preventDefault();
         document.getElementById('status').innerHTML = "Avataan varmistettua väylää<span class='loader'></span>";
         
         try {
-            // signInWithRedirect TÄYTYY kutsua suoraan käyttäjän klikkauksesta
-            // (Safari vaatii tämän)
-            await signInWithRedirect(auth, provider);
+            // Käytetään Popupia Redirectin sijaan
+            const result = await signInWithPopup(auth, provider);
+            console.log("Kirjautuminen onnistui:", result.user.email);
+            handleUserLogin(result.user);
         } catch (error) {
             console.error("Kirjautumisvirhe:", error.code);
-            document.getElementById('status').innerText = `Virhe: ${error.message}`;
+            if (error.code === 'auth/popup-blocked') {
+                document.getElementById('status').innerText = "⚠️ Selain esti ikkunan. Salli ponnahdusikkunat Safarin asetuksista.";
+            } else {
+                document.getElementById('status').innerText = `Virhe: ${error.message}`;
+            }
         }
     };
 
-    // 4. Monitoroi kirjautumistilaa (redirect-palautuksen jälkeen)
+    // Tarkistetaan onko käyttäjä jo kirjautunut
     onAuthStateChanged(auth, (user) => {
-        if (user && user.email === "jacke.seilaa@gmail.com") {
-            handleUserLogin(user);
-        } else if (user) {
-            // Väärä sähköpostiosoite
-            document.body.innerHTML = `
-                <div style="padding: 50px;">
-                    <h1 style="color:#ff6b6b">PÄÄSY EVÄTTY</h1>
-                    <p>Sähköposti: ${user.email}</p>
-                    <p>Sinulla ei ole käyttöoikeutta tähän sovellukseen.</p>
-                    <button onclick="location.reload()" style="padding:10px; margin-top:20px;">UUDELLEEN</button>
-                </div>`;
+        if (user) {
+            if (user.email === "jacke.seilaa@gmail.com") {
+                handleUserLogin(user);
+            } else {
+                document.body.innerHTML = `
+                    <div style="padding: 50px;">
+                        <h1 style="color:#ff6b6b">PÄÄSY EVÄTTY</h1>
+                        <p>Sähköposti: ${user.email}</p>
+                        <p>Sinulla ei ole käyttöoikeutta.</p>
+                        <button onclick="location.reload()" style="padding:10px; margin-top:20px;">UUDELLEEN</button>
+                    </div>`;
+            }
         }
     });
 
