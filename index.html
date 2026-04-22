@@ -2,52 +2,24 @@
 <html lang="fi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kuljetuskirja Testi</title>
     <style>
-        :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --text: #f0f0f0; --muted: #888; }
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .btn-login { background: #fff; color: #000; padding: 20px 40px; border-radius: 12px; font-weight: 800; font-size: 1.1rem; border: none; cursor: pointer; width: 100%; max-width: 300px; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
-        #app-content { display: none; width: 100%; max-width: 600px; }
-        h1 { font-family: 'Syne', sans-serif; color: var(--accent); margin-bottom: 10px; text-align: center; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 20px; }
-        textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--text); padding: 15px; min-height: 150px; font-size: 16px; margin-bottom: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { text-align: left; color: var(--accent); padding: 10px; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
-        td { padding: 10px; border-bottom: 1px solid #222; font-size: 0.9rem; }
+        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding-top: 50px; }
+        button { background: #c8f050; color: #000; padding: 20px 40px; font-size: 1.2rem; border-radius: 10px; border: none; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="auth-section">
     <h1>KULJETUSKIRJA</h1>
-    <p style="text-align: center; color: var(--muted); margin-bottom: 30px;">Hallinta iPadilla</p>
-    <button class="btn-login" id="btnLogin">KIRJAUDU SISÄÄN</button>
-</div>
-
-<div id="app-content">
-    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h1>AJO-LISTA</h1>
-        <button id="btnLogout" style="background:none; color:var(--muted); border:1px solid var(--border); padding:5px 10px; border-radius:8px;">ULOS</button>
-    </header>
-    <div class="card">
-        <textarea id="msgInput" placeholder="Liitä WhatsApp-viesti..."></textarea>
-        <button id="btnAdd" style="width:100%; padding:15px; background:var(--accent); border:none; border-radius:12px; font-weight:700;">LISÄÄ TIETOIHIN</button>
-    </div>
-    <div class="card">
-        <table>
-            <thead><tr><th>Klo</th><th>Reitti</th><th>€</th></tr></thead>
-            <tbody id="tbody"></tbody>
-        </table>
-    </div>
-</div>
+    <p id="info">Paina nappia kirjautuaksesi</p>
+    <br>
+    <button id="btn">KIRJAUDU SISÄÄN</button>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getAuth, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyB7Dp5_5fN0Iko-4Jn1D2Dp6NNNih63U0O",
@@ -59,46 +31,22 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
     const auth = getAuth(app);
+    const db = getFirestore(app);
     const provider = new GoogleAuthProvider();
 
-    // KIRJAUTUMINEN
-    document.getElementById('btnLogin').onclick = () => signInWithRedirect(auth, provider);
-    document.getElementById('btnLogout').onclick = () => signOut(auth);
+    // TÄMÄ ON TÄRKEÄ: Nappi reagoi suoraan klikkaukseen
+    document.getElementById('btn').addEventListener('click', () => {
+        document.getElementById('info').innerText = "Yhdistetään Googleen...";
+        signInWithRedirect(auth, provider);
+    });
 
     onAuthStateChanged(auth, (user) => {
         if (user && user.email === "jacke.seilaa@gmail.com") {
-            document.getElementById('auth-section').style.display = 'none';
-            document.getElementById('app-content').style.display = 'block';
-            startApp();
+            document.body.innerHTML = `<h1>Tervetuloa Jacke!</h1><p>Kirjautuminen onnistui.</p>`;
+            // Tähän tulee myöhemmin varsinainen käyttöliittymä, testataan ensin tämä.
         }
     });
-
-    function startApp() {
-        const q = query(collection(db, "taksitulot"), orderBy("createdAt", "desc"));
-        onSnapshot(q, (snapshot) => {
-            const tbody = document.getElementById('tbody');
-            tbody.innerHTML = '';
-            snapshot.forEach(doc => {
-                const r = doc.data();
-                tbody.innerHTML += `<tr><td>${r.time||''}</td><td>${r.to||''}</td><td style="color:var(--accent)">${r.price}€</td></tr>`;
-            });
-        });
-    }
-
-    document.getElementById('btnAdd').onclick = async () => {
-        const text = document.getElementById('msgInput').value;
-        if(!text) return;
-        const data = {
-            time: text.match(/(\d{1,2})[.:](\d{2})/)?.[0] || '',
-            to: text.split('\n')[2] || 'Tuntematon',
-            price: text.match(/(\d+)\s*[€eE]/)?.[1] || '0',
-            createdAt: new Date()
-        };
-        await addDoc(collection(db, "taksitulot"), data);
-        document.getElementById('msgInput').value = '';
-    };
 </script>
 </body>
 </html>
