@@ -5,52 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Kuljetuskirja</title>
     <style>
-        body { background: #0f0f0f; color: #fff; font-family: -apple-system, sans-serif; text-align: center; padding-top: 15vh; margin: 0; }
-        .container { padding: 20px; max-width: 400px; margin: auto; }
-        
-        .btn-main { 
-            background: #fff; color: #000; padding: 25px; border-radius: 50px; width: 100%;
+        body { background: #0f0f0f; color: #fff; font-family: -apple-system, sans-serif; text-align: center; padding-top: 20vh; margin: 0; }
+        .container { padding: 20px; }
+        .btn { 
+            display: none; padding: 25px; border-radius: 50px; width: 100%; max-width: 350px;
             font-weight: 900; font-size: 1.4rem; border: 4px solid #c8f050; cursor: pointer;
-            box-shadow: 0 0 30px rgba(200, 240, 80, 0.3); text-transform: uppercase;
+            text-transform: uppercase; margin: 20px auto;
         }
-
-        .btn-success { background: #c8f050 !important; border: 4px solid #fff !important; }
-
-        #status { margin: 20px 0; color: #c8f050; font-weight: bold; }
-        #ui-login, #ui-authenticated { display: none; }
-        .email-tag { color: #555; font-size: 0.9rem; margin-top: 15px; display: block; }
-        
-        /* Debug hienovaraisemmaksi */
-        #debug { font-size: 10px; color: #222; margin-top: 50px; text-align: left; opacity: 0.5; }
+        #startBtn { background: #fff; color: #000; }
+        #finalLink { background: #c8f050; color: #000; border-color: #fff; }
+        #status { color: #c8f050; margin-top: 20px; font-weight: bold; }
+        .v { color: #222; font-size: 10px; margin-top: 50px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1 style="color: #c8f050; font-size: 2.5rem; margin-bottom: 40px;">KULJETUSKIRJA</h1>
+    <h1 style="color: #c8f050; font-size: 2.5rem;">KULJETUSKIRJA</h1>
     
-    <div id="ui-login">
-        <button id="startBtn" class="btn-main">KIRJAUDU SISÄÄN</button>
-        <div id="status">Odotetaan...</div>
-    </div>
+    <div id="status">Tarkistetaan istuntoa...</div>
 
-    <div id="ui-authenticated">
-        <h2 style="color: #c8f050;">TERVETULOA JACKE</h2>
-        <button id="finalLink" class="btn-main btn-success">AVAA TAKSITILAUKSET</button>
-        <span id="userEmail" class="email-tag"></span>
-        <br>
-        <button onclick="logout()" style="background:none; border:none; color:#444; cursor:pointer; margin-top:30px;">Kirjaudu ulos</button>
-    </div>
+    <button id="startBtn" class="btn">KIRJAUDU SISÄÄN</button>
+    <button id="finalLink" class="btn">AVAA TAKSITILAUKSET</button>
 
-    <div id="debug">DEBUG LOG:</div>
+    <div id="userEmail" style="color:#666; margin-top:10px;"></div>
+    <div class="v">Versio 8.0 - Force Load</div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-    const log = (m) => { document.getElementById('debug').innerHTML += "<br>> " + m; };
-    
     const firebaseConfig = {
         apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
         authDomain: "jsailing-f716c.firebaseapp.com",
@@ -64,45 +49,39 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    // Tarkista onko juuri palattu Googlesta
-    getRedirectResult(auth).catch(e => log("Virhe: " + e.code));
+    const sBtn = document.getElementById('startBtn');
+    const fBtn = document.getElementById('finalLink');
+    const stat = document.getElementById('status');
 
-    // TILAN SEURANTA (Tärkein osa)
+    // TÄRKEÄIN FUNKTIO: Ohjaa näkymää
     onAuthStateChanged(auth, (user) => {
-        const loginUI = document.getElementById('ui-login');
-        const authUI = document.getElementById('ui-authenticated');
-
         if (user) {
-            log("Tila: Kirjautunut (" + user.email + ")");
             if (user.email === "jacke.seilaa@gmail.com") {
-                loginUI.style.display = 'none'; // Piilota login-nappi
-                authUI.style.display = 'block'; // Näytä tervetuloviesti
+                stat.innerText = "TERVETULOA JACKE";
+                sBtn.style.display = "none";
+                fBtn.style.display = "block"; // Näytä vihreä nappi
                 document.getElementById('userEmail').innerText = user.email;
             } else {
-                document.getElementById('status').innerText = "Ei pääsyä: " + user.email;
-                signOut(auth);
+                stat.innerText = "PÄÄSY EVÄTTY: " + user.email;
+                sBtn.style.display = "block";
+                fBtn.style.display = "none";
             }
         } else {
-            log("Tila: Ei käyttäjää");
-            loginUI.style.display = 'block';
-            authUI.style.display = 'none';
-            document.getElementById('status').innerText = "Valmiina.";
+            stat.innerText = "Vaatii kirjautumisen";
+            sBtn.style.display = "block"; // Näytä valkoinen nappi
+            fBtn.style.display = "none";
         }
     });
 
-    // Nappien toiminnot
-    document.getElementById('startBtn').onclick = () => {
-        document.getElementById('status').innerText = "Ohjataan Googleen...";
+    // Kirjautumisen aloitus
+    sBtn.onclick = () => {
+        stat.innerText = "Ohjataan Googleen...";
         signInWithRedirect(auth, provider);
     };
 
-    document.getElementById('finalLink').onclick = () => {
-        log("Siirrytään taksitilauksiin...");
-        window.location.assign("https://jackeseilaa.github.io/taksitilaukset/");
-    };
-
-    window.logout = () => {
-        signOut(auth).then(() => location.reload());
+    // Siirtyminen perille
+    fBtn.onclick = () => {
+        window.location.replace("https://jackeseilaa.github.io/taksitilaukset/");
     };
 </script>
 </body>
