@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="fi">
 <head>
     <meta charset="UTF-8">
@@ -11,27 +12,37 @@
             border-radius: 50px; font-weight: 900; font-size: 1.4rem; 
             border: 4px solid #c8f050; cursor: pointer;
             box-shadow: 0 0 30px rgba(200, 240, 80, 0.3);
+            transition: all 0.2s;
         }
-        #status { margin-top: 30px; color: #c8f050; font-weight: bold; min-height: 1.5em; }
+        .btn-fix:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-fix:active { transform: scale(0.98); }
+        #status { margin-top: 30px; color: #c8f050; font-weight: bold; min-height: 1.5em; font-size: 1.1rem; }
         .v-tag { color: #333; font-size: 0.7rem; margin-top: 50px; }
+        .spinner { display: inline-block; width: 1em; height: 1em; border: 3px solid #c8f050; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 8px; vertical-align: -0.125em; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error { color: #ff6b6b !important; }
+        .success { color: #51cf66 !important; }
     </style>
 </head>
 <body>
 
-    <h1 style="color: #c8f050; font-size: 2.5rem;">KULJETUSKIRJA</h1>
-    <p style="margin-bottom: 40px; color: #aaa;">iPad Safari -varmistettu väylä</p>
+```
+<h1 style="color: #c8f050; font-size: 2.5rem;">KULJETUSKIRJA</h1>
+<p style="margin-bottom: 40px; color: #aaa;">iPad Safari -varmistettu väylä</p>
 
-    <button id="startBtn" class="btn-fix">KIRJAUDU TÄSTÄ</button>
+<button id="startBtn" class="btn-fix">KIRJAUDU TÄSTÄ</button>
 
-    <div id="status">Odottaa...</div>
-    <div class="v-tag">Versio 1.5 (Forced Redirect)</div>
+<div id="status">Alustetaan...</div>
+<div class="v-tag">Versio 2.0 (Korjattu apiKey)</div>
+```
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
+    // ⚠️ KRIITTISET TIEDOT - jsailing-f716c projektista
     const firebaseConfig = {
-        apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
+        apiKey: "AIzaSyB7Dp5_5fN0Iko-4Jn1D2Dp6NNNih63U0O",  // ✅ OIKEA AVAIN
         authDomain: "jsailing-f716c.firebaseapp.com",
         projectId: "jsailing-f716c",
         storageBucket: "jsailing-f716c.firebasestorage.app",
@@ -43,42 +54,101 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    // Tarkistetaan onko palattu Googlesta
-    window.onload = async () => {
+    // Asetetaan Google-parametrit
+    provider.setCustomParameters({
+        prompt: 'select_account',
+        access_type: 'online'
+    });
+
+    let isCheckingRedirect = false;
+
+    // ✅ HETI SIVUN LATAUTUMISEN JÄLKEEN: tarkista onko palattu Googlesta
+    (async () => {
+        isCheckingRedirect = true;
         try {
-            await getRedirectResult(auth);
+            const result = await getRedirectResult(auth);
+            if (result && result.user) {
+                console.log("✅ Redirect onnistui:", result.user.email);
+                // onAuthStateChanged hoitaa loput
+            } else {
+                console.log("ℹ️ Ei redirect-palautusta, normaalilla sivulla");
+                document.getElementById('status').innerText = "Odottaa...";
+            }
         } catch (error) {
-            document.getElementById('status').innerText = "Virhe: " + error.code;
+            console.error("❌ Redirect-virhe:", error.code);
+            document.getElementById('status').classList.add('error');
+            
+            if (error.code === 'auth/popup-closed-by-user') {
+                document.getElementById('status').innerText = "Kirjautuminen peruutettiin.";
+            } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
+                document.getElementById('status').innerText = "⚠️ Redirect ei toimi tällä tavalla. Kokeile uudestaan.";
+            } else {
+                document.getElementById('status').innerText = "Virhe: " + error.message;
+            }
+        }
+        isCheckingRedirect = false;
+    })();
+
+    // ✅ NAPPI: klikkaa -> avataan Google-popup
+    document.getElementById('startBtn').onclick = async (e) => {
+        e.preventDefault();
+        
+        if (isCheckingRedirect) {
+            document.getElementById('status').innerText = "Odota hetki...";
+            return;
+        }
+
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('status').innerHTML = "Avataan Googlea<span class='spinner'></span>";
+        document.getElementById('status').classList.remove('error', 'success');
+
+        try {
+            // ✅ KRIITTIINEN: signInWithRedirect TÄYTYY kutsua suoraan klikkauksesta
+            await signInWithRedirect(auth, provider);
+            // Jos tänne päästään, sivu ohjautuu pois
+        } catch (error) {
+            console.error("❌ Kirjautumisvirhe:", error.code, error.message);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('status').classList.add('error');
+            
+            if (error.code === 'auth/popup-blocked') {
+                document.getElementById('status').innerText = "❌ Popup on estetty. Salli popup tässä sovelluksessa.";
+            } else {
+                document.getElementById('status').innerText = "❌ " + error.message;
+            }
         }
     };
 
-    // Kirjautumisnappi
-    document.getElementById('startBtn').onclick = () => {
-        document.getElementById('status').innerText = "Avataan Googlea...";
-        setTimeout(() => {
-            signInWithRedirect(auth, provider);
-        }, 100); // Pieni viive auttaa Safaria ymmärtämään komennon
-    };
-
-    // Kun tunnistus on valmis
+    // ✅ Kun kirjautuminen on valmis (redirect-palautus tai normaalit muutokset)
     onAuthStateChanged(auth, (user) => {
+        console.log("Auth state changed:", user?.email || "ei käyttäjää");
+
         if (user && user.email === "jacke.seilaa@gmail.com") {
+            // ✅ OIKEA KÄYTTÄJÄ
             document.body.innerHTML = `
                 <div style="padding: 50px;">
-                    <h1 style="color:#c8f050; font-size: 3rem;">TERVETULOA</h1>
-                    <p>Jacke, olet kirjautunut sisään.</p>
+                    <h1 style="color:#c8f050; font-size: 3rem;">✅ TERVETULOA</h1>
+                    <p style="font-size: 1.2rem; margin: 20px 0;">Jacke, olet kirjautunut sisään.</p>
+                    <p style="color:#888; margin: 10px 0;">${user.email}</p>
+                    
                     <button id="finalLink" 
-                            style="padding:20px 40px; background:#c8f050; color:#000; border:none; border-radius:15px; cursor:pointer; font-weight:bold; font-size:1.5rem; margin-top:20px;">
+                            style="padding:20px 40px; background:#c8f050; color:#000; border:none; border-radius:15px; cursor:pointer; font-weight:bold; font-size:1.5rem; margin-top:30px; transition: all 0.2s;">
                         AVAA TAKSITILAUKSET
                     </button>
-                    <p style="margin-top:40px; color:#555; font-size:0.8rem;">Sähköposti: ${user.email}</p>
                 </div>`;
             
-            document.getElementById('finalLink').onclick = () => {
+            const finalLink = document.getElementById('finalLink');
+            finalLink.onmouseover = () => finalLink.style.boxShadow = "0 0 20px rgba(200, 240, 80, 0.5)";
+            finalLink.onmouseout = () => finalLink.style.boxShadow = "none";
+            
+            finalLink.onclick = () => {
                 window.location.assign('https://jackeseilaa.github.io/taksitilaukset/');
             };
         } else if (user) {
-            document.getElementById('status').innerText = "Ei pääsyä: " + user.email;
+            // ❌ VÄÄRÄ KÄYTTÄJÄ
+            document.getElementById('status').classList.add('error');
+            document.getElementById('status').innerText = `❌ Ei pääsyä: ${user.email}`;
+            document.getElementById('startBtn').disabled = false;
         }
     });
 </script>
