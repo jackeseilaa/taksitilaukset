@@ -3,20 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V31.7</title>
+    <title>Kuljetuskirja V31.8</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { 
-            --bg: #0f0f0f; 
-            --surface: #1a1a1a; 
-            --border: #2e2e2e; 
-            --accent: #c8f050; 
-            --accent2: #50c8f0; 
-            --text: #f0f0f0; 
-            --muted: #666; 
-            --edit: #f0a050;
-            --future-bg: #d4f8a0; /* Vaaleanvihreä tuleville */
-            --future-text: #000000;
+            --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; 
+            --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; 
+            --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 15px; }
@@ -38,10 +31,14 @@
         th { text-align: left; color: var(--accent2); padding: 10px; border-bottom: 1px solid var(--border); background: #222; }
         td { padding: 10px; border-bottom: 1px solid #222; vertical-align: top; }
 
-        /* VÄRITYS SÄÄNNÖT */
+        /* PÄIVÄEROTIN */
+        .day-separator { border-top: 2px solid var(--accent2) !important; }
+        .day-gap { height: 10px; background: var(--bg); }
+
+        /* VÄRITYS */
         .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
         .row-future b, .row-future small { color: #000 !important; }
-        .row-past { opacity: 0.5; filter: grayscale(1); } /* Harmaasävy menneille */
+        .row-past { opacity: 0.5; filter: grayscale(1); }
         
         .price-text { color: var(--accent); font-weight: bold; }
         .row-future .price-text { color: #000; border: 1px solid #000; padding: 1px 4px; border-radius: 4px; }
@@ -50,7 +47,7 @@
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 31.7</div>
+    <div class="v-tag">VERSIO 31.8</div>
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
         <button class="btn-login" id="btnLogin">KIRJAUDU GOOGLE-TUNNUKSELLA</button>
@@ -61,7 +58,7 @@
             <button id="btnLogout" style="background:none; color:inherit; border:none; text-decoration:underline;">Ulos</button>
         </div>
         <h1>UUSI TILAUS</h1>
-        <textarea id="msgInput" placeholder="Liitä viesti..."></textarea>
+        <textarea id="msgInput" placeholder="Liitä viesti (Lähtö, Nouto, Lento...)..."></textarea>
         <button class="btn-add" id="btnAdd">TALLENNA TILAUS</button>
         <div class="table-wrapper">
             <table>
@@ -117,6 +114,7 @@
             tbody.innerHTML = '';
             currentLogs = [];
             const now = Date.now();
+            let lastDate = "";
 
             snapshot.forEach(d => {
                 const r = d.data();
@@ -133,8 +131,16 @@
                 const isFuture = (r.driveTimestamp || 0) > now;
                 const rowClass = isFuture ? 'row-future' : 'row-past';
                 
+                // Tarkistetaan päivän vaihtuminen viivaa varten
+                const currentDate = r.date || "";
+                let separatorClass = "";
+                if (lastDate !== "" && currentDate !== lastDate) {
+                    separatorClass = "day-separator";
+                }
+                lastDate = currentDate;
+
                 const tr = document.createElement('tr');
-                tr.className = rowClass;
+                tr.className = `${rowClass} ${separatorClass}`;
                 tr.innerHTML = `
                     <td><b>${r.date || ''}</b><br>${r.time || ''}</td>
                     <td><small>N:</small> ${r.from}<br><small>K:</small> ${r.to}</td>
@@ -174,22 +180,31 @@
         const getSmartVal = (keywords) => {
             const i = lines.findIndex(l => keywords.some(k => l.toLowerCase().includes(k.toLowerCase())));
             if (i === -1) return '—';
-            if (lines[i].includes(':')) return lines[i].split(':').slice(1).join(':').trim().replace(/[\/]/g, '');
+            if (lines[i].includes(':')) return lines[i].split(':').slice(1).join(':').trim();
             return lines[i+1] || '—';
         };
 
+        // Lennonnumeron haku (Esim AY123, DY 1234, SK123)
+        const flightMatch = text.match(/([A-Z]{2}\s?\d{1,4})/i);
+        
         const phoneMatch = text.match(/(\+?\d[\d\s]{6,14}\d)/);
         const priceMatch = text.match(/(\d+)\s*[e€]/i);
-        const flightMatch = text.match(/([A-Z]{2,3}\s?\d{1,4})/i);
         
         let nouto = getSmartVal(['Lähtö', 'Nouto', 'Noutopaikka']);
-        if (flightMatch && (!nouto || nouto === '—')) nouto = "Lento: " + flightMatch[0].toUpperCase();
+        
+        // Jos noutoa ei löytynyt avainsanalla, mutta lento löytyi, käytetään lentoa
+        if ((nouto === '—' || !nouto) && flightMatch) {
+            nouto = "Lento: " + flightMatch[0].toUpperCase();
+        }
 
         const dateMatch = text.match(/(\d{1,2})\.(\d{1,2})/);
         const timeMatch = text.match(/(\d{1,2})[.:](\d{2})/);
         let driveDate = new Date();
         if (text.toLowerCase().includes('huomenna')) driveDate.setDate(driveDate.getDate() + 1);
-        if (dateMatch) { driveDate.setDate(parseInt(dateMatch[1])); driveDate.setMonth(parseInt(dateMatch[2]) - 1); }
+        if (dateMatch) { 
+            driveDate.setDate(parseInt(dateMatch[1])); 
+            driveDate.setMonth(parseInt(dateMatch[2]) - 1); 
+        }
         if (timeMatch) driveDate.setHours(parseInt(timeMatch[1]), parseInt(timeMatch[2]), 0);
 
         let customerRaw = getSmartVal(['Nimi', 'Kyytiin', 'Matkustaja']);
@@ -198,9 +213,9 @@
         const data = {
             date: dateMatch ? dateMatch[0] : (text.toLowerCase().includes('huomenna') ? 'Huomenna' : 'Tänään'),
             time: timeMatch ? timeMatch[0] : '—',
-            from: nouto || '—',
+            from: nouto,
             to: getSmartVal(['Meno', 'Kohde', 'Määränpää']),
-            customer: customerClean || '—',
+            customer: customerClean,
             phone: phoneMatch ? phoneMatch[0] : '—',
             price: priceMatch ? priceMatch[1] : '0',
             type: text.toLowerCase().includes('vip') ? 'VIP' : 'Normaali',
