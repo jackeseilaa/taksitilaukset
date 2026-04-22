@@ -3,37 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V19 - MANUAL ONLY</title>
+    <title>Kuljetuskirja V20</title>
     <style>
-        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding-top: 20vh; margin: 0; }
-        .v-badge { color: #333; font-size: 12px; margin-bottom: 10px; }
-        #status { color: #c8f050; font-size: 1.8rem; font-weight: bold; margin-bottom: 30px; }
-        
-        /* Vain yksi nappi kerrallaan näkyvissä */
-        .btn { 
-            display: none; width: 85%; max-width: 350px; padding: 25px; 
-            border-radius: 50px; font-weight: 900; font-size: 1.4rem; 
-            text-decoration: none; margin: 0 auto; border: 4px solid #fff; 
-            text-transform: uppercase; cursor: pointer;
+        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding-top: 20vh; }
+        .nappi { 
+            display: inline-block; padding: 20px 40px; background: #c8f050; color: #000; 
+            text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 1.2rem;
         }
-        #loginBtn { background: #fff; color: #000; }
-        #goBtn { background: #c8f050; color: #000; }
+        #tila { margin-bottom: 20px; color: #c8f050; }
     </style>
 </head>
 <body>
-    <div class="v-badge">VERSIO 19.0</div>
-    <div id="status">ALUSTETAAN...</div>
 
-    <button id="loginBtn" class="btn">1. KIRJAUDU SISÄÄN</button>
+    <div style="color: #222; font-size: 10px;">VERSIO 20.0</div>
+    <h1>KULJETUSKIRJA</h1>
+    <div id="tila">Odotetaan...</div>
 
-    <a id="goBtn" href="https://jackeseilaa.github.io/taksitilaukset/" class="btn">
-        2. AVAA TILAUSET TÄSTÄ
-    </a>
+    <div id="sisalto">
+        </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithRedirect, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
+    // Käytetään varmistettua API-avainta
     const firebaseConfig = {
         apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
         authDomain: "jsailing-f716c.firebaseapp.com",
@@ -45,26 +38,22 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    const container = document.getElementById('sisalto');
+    const tila = document.getElementById('tila');
 
     onAuthStateChanged(auth, (user) => {
-        const lBtn = document.getElementById('loginBtn');
-        const gBtn = document.getElementById('goBtn');
-        const stat = document.getElementById('status');
-
         if (user && user.email === "jacke.seilaa@gmail.com") {
-            stat.innerText = "TUNNISTETTU OK";
-            lBtn.style.display = "none";
-            gBtn.style.display = "block"; // Aktivoi vihreä nappi
+            tila.innerText = "Tervetuloa " + user.email;
+            container.innerHTML = '<a href="https://jackeseilaa.github.io/taksitilaukset/" class="nappi">AVAA TAKSITILAUKSET</a>';
         } else {
-            stat.innerText = "ODOTTAA KIRJAUTUMISTA";
-            lBtn.style.display = "block";
-            gBtn.style.display = "none";
+            tila.innerText = "Kirjaudu sisään jatkaaksesi";
+            container.innerHTML = '<button id="login" class="nappi" style="background:#fff;">KIRJAUDU TÄSTÄ</button>';
+            
+            document.getElementById('login').onclick = () => {
+                signInWithRedirect(auth, new GoogleAuthProvider());
+            };
         }
     });
-
-    document.getElementById('loginBtn').onclick = () => {
-        signInWithRedirect(auth, new GoogleAuthProvider());
-    };
 </script>
 </body>
 </html>
