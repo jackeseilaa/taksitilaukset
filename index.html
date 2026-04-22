@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V31.4</title>
+    <title>Kuljetuskirja V31.5</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; }
@@ -27,7 +27,7 @@
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 31.4</div>
+    <div class="v-tag">VERSIO 31.5</div>
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
         <button class="btn-login" id="btnLogin">KIRJAUDU GOOGLE-TUNNUKSELLA</button>
@@ -38,7 +38,7 @@
             <button id="btnLogout" style="background:none; color:inherit; border:none; text-decoration:underline;">Ulos</button>
         </div>
         <h1 id="form-title">UUSI TILAUS</h1>
-        <textarea id="msgInput" placeholder="Liitä viesti (Lähtö, Nouto, Lento...)..."></textarea>
+        <textarea id="msgInput" placeholder="Liitä viesti..."></textarea>
         <button class="btn-add" id="btnAdd">TALLENNA TILAUS</button>
         <button class="btn-excel" id="btnExport">📥 LATAA EXCEL</button>
         <div class="table-wrapper">
@@ -99,7 +99,6 @@
                 currentLogs.push({id: d.id, ...r});
             });
 
-            // Järjestetään koodilla: driveTimestamp tai createdAt
             currentLogs.sort((a, b) => {
                 const valA = a.driveTimestamp || (a.createdAt ? a.createdAt.toMillis() : 0);
                 const valB = b.driveTimestamp || (b.createdAt ? b.createdAt.toMillis() : 0);
@@ -149,6 +148,9 @@
             return lines[i+1] || '—';
         };
 
+        const phoneMatch = text.match(/(\+?\d[\d\s]{6,14}\d)/);
+        const priceMatch = text.match(/(\d+)\s*[e€]/i);
+
         const flightMatch = text.match(/([A-Z]{2,3}\s?\d{1,4})/i);
         let nouto = getSmartVal(['Lähtö', 'Nouto', 'Noutopaikka']);
         if (flightMatch && (!nouto || nouto === '—')) nouto = "Lento: " + flightMatch[0].toUpperCase();
@@ -160,14 +162,18 @@
         if (dateMatch) { driveDate.setDate(parseInt(dateMatch[1])); driveDate.setMonth(parseInt(dateMatch[2]) - 1); }
         if (timeMatch) driveDate.setHours(parseInt(timeMatch[1]), parseInt(timeMatch[2]), 0);
 
+        // Siivotaan puhelinnumero pois asiakasnimestä jos se on sinne eksynyt
+        let customerRaw = getSmartVal(['Nimi', 'Kyytiin', 'Matkustaja']);
+        let customerClean = customerRaw.replace(/(\+?\d[\d\s]{6,14}\d)/, '').trim();
+
         const data = {
             date: dateMatch ? dateMatch[0] : (text.toLowerCase().includes('huomenna') ? 'Huomenna' : 'Tänään'),
             time: timeMatch ? timeMatch[0] : '—',
             from: nouto || '—',
             to: getSmartVal(['Meno', 'Kohde', 'Määränpää']),
-            customer: getSmartVal(['Nimi', 'Kyytiin', 'Matkustaja', 'Kyytiin:']),
-            phone: text.match(/(\+?\d[\d\s]{7,15})/)?.[0] || '—',
-            price: text.match(/(\d+)\s*[e€]/i)?.[1] || '0',
+            customer: customerClean || '—',
+            phone: phoneMatch ? phoneMatch[0] : '—',
+            price: priceMatch ? priceMatch[1] : '0',
             type: text.toLowerCase().includes('vip') ? 'VIP' : 'Normaali',
             notes: lines.find(l => l.toLowerCase().includes('odotus') || l.toLowerCase().includes('huomio')) || '—',
             billing: getSmartVal(['Laskulle', 'Maksutapa']),
