@@ -12,18 +12,19 @@
             border: 4px solid #c8f050; cursor: pointer;
             box-shadow: 0 0 30px rgba(200, 240, 80, 0.3);
         }
+        #status { margin-top: 30px; color: #c8f050; font-weight: bold; min-height: 1.5em; }
         .v-tag { color: #333; font-size: 0.7rem; margin-top: 50px; }
     </style>
 </head>
 <body>
 
     <h1 style="color: #c8f050; font-size: 2.5rem;">KULJETUSKIRJA</h1>
-    <p style="margin-bottom: 40px; color: #aaa;">Pääsy varmistettuun väylään</p>
+    <p style="margin-bottom: 40px; color: #aaa;">iPad Safari -varmistettu väylä</p>
 
     <button id="startBtn" class="btn-fix">KIRJAUDU TÄSTÄ</button>
 
-    <div id="status" style="margin-top:20px; color:#c8f050;">Valmis</div>
-    <div class="v-tag">Versio 1.4 (Final Fix)</div>
+    <div id="status">Odottaa...</div>
+    <div class="v-tag">Versio 1.5 (Forced Redirect)</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -42,31 +43,42 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    getRedirectResult(auth).catch((error) => {
-        console.error(error);
-    });
-
-    document.getElementById('startBtn').onclick = () => {
-        document.getElementById('status').innerText = "Siirrytään Googleen...";
-        signInWithRedirect(auth, provider);
+    // Tarkistetaan onko palattu Googlesta
+    window.onload = async () => {
+        try {
+            await getRedirectResult(auth);
+        } catch (error) {
+            document.getElementById('status').innerText = "Virhe: " + error.code;
+        }
     };
 
+    // Kirjautumisnappi
+    document.getElementById('startBtn').onclick = () => {
+        document.getElementById('status').innerText = "Avataan Googlea...";
+        setTimeout(() => {
+            signInWithRedirect(auth, provider);
+        }, 100); // Pieni viive auttaa Safaria ymmärtämään komennon
+    };
+
+    // Kun tunnistus on valmis
     onAuthStateChanged(auth, (user) => {
         if (user && user.email === "jacke.seilaa@gmail.com") {
-            // TÄMÄ OSA ON NYT KORJATTU
             document.body.innerHTML = `
                 <div style="padding: 50px;">
-                    <h1 style="color:#c8f050; font-size: 3.5rem;">TERVETULOA</h1>
-                    <p style="font-size: 1.2rem;">Jacke, yhteys on auki.</p>
-                    <button id="goBtn" 
-                            style="padding:25px 50px; background:#c8f050; color:#000; border:none; border-radius:15px; cursor:pointer; font-weight:bold; font-size:1.5rem; margin-top:30px;">
+                    <h1 style="color:#c8f050; font-size: 3rem;">TERVETULOA</h1>
+                    <p>Jacke, olet kirjautunut sisään.</p>
+                    <button id="finalLink" 
+                            style="padding:20px 40px; background:#c8f050; color:#000; border:none; border-radius:15px; cursor:pointer; font-weight:bold; font-size:1.5rem; margin-top:20px;">
                         AVAA TAKSITILAUKSET
                     </button>
+                    <p style="margin-top:40px; color:#555; font-size:0.8rem;">Sähköposti: ${user.email}</p>
                 </div>`;
             
-            document.getElementById('goBtn').onclick = () => {
-                window.location.href = 'https://jackeseilaa.github.io/taksitilaukset/';
+            document.getElementById('finalLink').onclick = () => {
+                window.location.assign('https://jackeseilaa.github.io/taksitilaukset/');
             };
+        } else if (user) {
+            document.getElementById('status').innerText = "Ei pääsyä: " + user.email;
         }
     });
 </script>
