@@ -1,77 +1,18 @@
-<!DOCTYPE html>
-<html lang="fi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja</title>
-    <style>
-        body { background: #0f0f0f; color: #fff; font-family: sans-serif; text-align: center; padding-top: 15vh; margin: 0; }
-        .btn-fix { 
-            background: #fff; color: #000; padding: 25px 50px; 
-            border-radius: 50px; font-weight: 900; font-size: 1.4rem; 
-            border: 4px solid #c8f050; cursor: pointer;
-            box-shadow: 0 0 30px rgba(200, 240, 80, 0.3);
-        }
-        #status { margin-top: 30px; color: #c8f050; font-weight: bold; }
-        .v-tag { color: #333; font-size: 0.7rem; margin-top: 50px; }
-    </style>
-</head>
-<body>
+function handleUserLogin(user) {
+    // Lisätään loppuun index.html ja varmistetaan ettei selain estä siirtymistä
+    const kohdeOsoite = "https://jackeseilaa.github.io/taksitilaukset/index.html";
+    
+    document.body.innerHTML = `
+        <div style="padding: 50px; text-align: center;">
+            <h1 style="color:#c8f050; font-size: 3rem;">TERVETULOA</h1>
+            <p>Jacke, yhteys on auki.</p>
+            <button id="finalLink" 
+                    style="padding:20px 40px; background:#c8f050; color:#000; border:none; border-radius:15px; cursor:pointer; font-weight:bold; font-size:1.2rem; margin-top:20px;">
+                AVAA TAKSITILAUKSET
+            </button>
+        </div>`;
 
-    <h1 style="color: #c8f050; font-size: 2.5rem;">KULJETUSKIRJA</h1>
-    <p style="margin-bottom: 40px; color: #aaa;">Pääsy varmistettuun väylään</p>
-
-    <button id="startBtn" class="btn-fix">KIRJAUDU TÄSTÄ</button>
-
-    <div id="status">Tila: Valmis</div>
-    <div class="v-tag">Versio 1.3 (Redirect-malli)</div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
-        authDomain: "jsailing-f716c.firebaseapp.com",
-        projectId: "jsailing-f716c",
-        storageBucket: "jsailing-f716c.firebasestorage.app",
-        messagingSenderId: "543523103696",
-        appId: "1:543523103696:web:439a312efa6aec398a8fd5"
+    document.getElementById('finalLink').onclick = () => {
+        window.location.assign(kohdeOsoite);
     };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-
-    // 1. Tarkistetaan heti kun tullaan takaisin Googlesta
-    getRedirectResult(auth).catch((error) => {
-        if (error.code !== 'auth/redirect-cancelled-by-user') {
-            document.getElementById('status').innerText = "Virhe palatessa: " + error.message;
-        }
-    });
-
-    // 2. Napin painallus ohjaa Googleen
-    document.getElementById('startBtn').onclick = (e) => {
-        e.preventDefault();
-        document.getElementById('status').innerText = "Siirrytään Google-varmistukseen...";
-        signInWithRedirect(auth, provider);
-    };
-
-    // 3. Kun käyttäjä on tunnistettu
-    onAuthStateChanged(auth, (user) => {
-        if (user && user.email === "jacke.seilaa@gmail.com") {
-            document.body.innerHTML = `
-                <div style="padding: 50px;">
-                    <h1 style="color:#c8f050; font-size: 3rem;">TERVETULOA</h1>
-                    <p>Jacke, yhteys on auki.</p>
-                    <button onclick="window.location.replace('https://jackeseilaa.github.io/taksitilaukset/')" 
-                            style="padding:20px 40px; background:#c8f050; color:#000; border:none; border-radius:15px; cursor:pointer; font-weight:bold; font-size:1.2rem; margin-top:20px;">
-                        AVAA TAKSITILAUKSET
-                    </button>
-                </div>`;
-        }
-    });
-</script>
-
-</body>
-</html>
+}
