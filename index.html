@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V30</title>
+    <title>Kuljetuskirja V31</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; }
@@ -27,7 +27,7 @@
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 30.0</div>
+    <div class="v-tag">VERSIO 31.0 (AIKAJÄRJESTYS)</div>
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
         <button class="btn-login" id="btnLogin">KIRJAUDU GOOGLE-TUNNUKSELLA</button>
@@ -38,7 +38,7 @@
             <button id="btnLogout" style="background:none; color:inherit; border:none; text-decoration:underline;">Ulos</button>
         </div>
         <h1 id="form-title">UUSI TILAUS</h1>
-        <textarea id="msgInput" placeholder="Liitä viesti tai muokkaa tietoja..."></textarea>
+        <textarea id="msgInput" placeholder="Liitä viesti..."></textarea>
         <button class="btn-add" id="btnAdd">TALLENNA TILAUS</button>
         <button class="btn-excel" id="btnExport">📥 LATAA EXCEL (CSV)</button>
         <div class="table-wrapper">
@@ -89,7 +89,8 @@
     document.getElementById('btnLogout').onclick = () => signOut(auth);
 
     function startListening() {
-        const q = query(collection(db, "taksitulot"), orderBy("createdAt", "desc"));
+        // MUUTOS: Järjestetään driveTimestampin mukaan (itse ajankohta)
+        const q = query(collection(db, "taksitulot"), orderBy("driveTimestamp", "desc"));
         onSnapshot(q, (snapshot) => {
             const tbody = document.getElementById('tbody');
             tbody.innerHTML = '';
@@ -124,7 +125,6 @@
         document.getElementById('msgInput').value = `Pvm: ${item.date}\nKlo: ${item.time}\nLähtö: ${item.from}\nMeno: ${item.to}\nAsiakas: ${item.customer}\nPuh: ${item.phone}\nHinta: ${item.price}\nTyyppi: ${item.type}\nLaskulle: ${item.billing}\nTilaaja: ${item.booker}\nHuomio: ${item.notes}`;
         document.getElementById('btnAdd').innerText = "PÄIVITÄ TILAUS";
         document.getElementById('btnAdd').classList.add('btn-update');
-        document.getElementById('form-title').innerText = "MUOKKAA TILAUSTA";
         window.scrollTo(0,0);
     }
 
@@ -140,9 +140,27 @@
             return lines[i+1] || '—';
         };
 
+        // Lasketaan tekninen aikaleima järjestämistä varten
+        const dateMatch = text.match(/(\d{1,2})\.(\d{1,2})/);
+        const timeMatch = text.match(/(\d{1,2})[.:](\d{2})/);
+        let driveDate = new Date();
+        
+        if (text.toLowerCase().includes('huomenna')) {
+            driveDate.setDate(driveDate.getDate() + 1);
+        }
+        
+        if (dateMatch) {
+            driveDate.setDate(parseInt(dateMatch[1]));
+            driveDate.setMonth(parseInt(dateMatch[2]) - 1);
+        }
+        
+        if (timeMatch) {
+            driveDate.setHours(parseInt(timeMatch[1]), parseInt(timeMatch[2]), 0);
+        }
+
         const data = {
-            date: text.match(/(\d{1,2})\.(\d{1,2})/)?.[0] || '—',
-            time: text.match(/(\d{1,2})[.:](\d{2})/)?.[0] || '—',
+            date: dateMatch ? dateMatch[0] : (text.toLowerCase().includes('huomenna') ? 'Huomenna' : 'Tänään'),
+            time: timeMatch ? timeMatch[0] : '—',
             from: getSmartVal(['Lähtö']),
             to: getSmartVal(['Meno', 'Kohde']),
             customer: getSmartVal(['Nimi', 'Kyytiin', 'Matkustaja']),
@@ -152,6 +170,7 @@
             notes: lines.find(l => l.toLowerCase().includes('odotus') || l.toLowerCase().includes('huomio')) || '—',
             billing: getSmartVal(['Laskulle']),
             booker: getSmartVal(['Tilaaja']).replace(/[\/]/g, '').trim(),
+            driveTimestamp: driveDate.getTime(), // Käytetään järjestämiseen
             updatedAt: serverTimestamp()
         };
 
@@ -160,7 +179,6 @@
             editId = null;
             document.getElementById('btnAdd').innerText = "TALLENNA TILAUS";
             document.getElementById('btnAdd').classList.remove('btn-update');
-            document.getElementById('form-title').innerText = "UUSI TILAUS";
         } else {
             data.createdAt = serverTimestamp();
             await addDoc(collection(db, "taksitulot"), data);
