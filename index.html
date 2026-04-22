@@ -27,7 +27,7 @@
     <h1>KULJETUSKIRJA</h1>
     <p style="color: var(--muted);">Kirjaudu sisään iPadilla</p>
     <button class="btn-login" id="btnLogin">KIRJAUDU TÄSTÄ</button>
-    <p id="status" style="margin-top:20px; font-size:0.8rem; color:var(--muted);"></p>
+    <p id="status" style="margin-top:20px; font-size:0.8rem; color:var(--muted);">Tämä tapa ei käytä ponnahdusikkunoita.</p>
 </div>
 
 <div id="app-content">
@@ -48,7 +48,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyB7Dp5_5fN0Iko-4Jn1D2Dp6NNNih63U0O",
@@ -64,15 +64,23 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    // Käytetään Popupia, joka on usein varmempi iPadin "jumittumista" vastaan
-    document.getElementById('btnLogin').onclick = async () => {
-        document.getElementById('status').innerText = "Avataan kirjautumisikkuna...";
-        try {
-            await signInWithPopup(auth, provider);
-        } catch (e) {
-            document.getElementById('status').innerText = "Virhe: Salli ponnahdusikkunat asetuksista.";
-            console.error(e);
+    // Pakotetaan Google kysymään tiliä, jotta se ei jumiudu
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    // Tarkistetaan heti kun tullaan takaisin kirjautumisesta
+    getRedirectResult(auth).then((result) => {
+        if (result?.user) {
+            console.log("Kirjautuminen onnistui");
         }
+    }).catch((error) => {
+        if (error.code !== 'auth/invalid-pending-token') {
+            document.getElementById('status').innerText = "Virhe: " + error.message;
+        }
+    });
+
+    document.getElementById('btnLogin').onclick = () => {
+        document.getElementById('status').innerText = "Ohjataan Googleen...";
+        signInWithRedirect(auth, provider);
     };
 
     document.getElementById('btnLogout').onclick = () => signOut(auth);
