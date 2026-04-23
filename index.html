@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V34.5</title>
+    <title>Kuljetuskirja V34.6</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; }
@@ -33,7 +33,7 @@
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 34.5 (SMART NOTES)</div>
+    <div class="v-tag">VERSIO 34.6 (FIXED PARSING)</div>
 
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
@@ -90,7 +90,6 @@
         const txt = document.getElementById('msgInput').value;
         const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
-        // 1. PVM & KLO
         let pvmMatch = txt.match(/(\d{1,2})\.(\d{1,2})/);
         if (pvmMatch) {
             let pvm = pvmMatch[0];
@@ -98,12 +97,9 @@
             document.getElementById('inPvm').value = pvm;
         }
         document.getElementById('inKlo').value = txt.match(/(\d{1,2})[.:](\d{2})/)?.[0] || "";
-        
-        // 2. HINTA & TYYPPI
         document.getElementById('inHinta').value = txt.match(/(\d{1,3})\s*[e€]/i)?.[1] || "";
         document.getElementById('inTyyppi').value = txt.toLowerCase().includes('vip') ? 'VIP' : 'Normaali';
         
-        // 3. REITIT
         const fromIdx = lines.findIndex(l => l.toLowerCase().startsWith('lähtö') || l.toLowerCase().startsWith('nouto'));
         const fromVal = (fromIdx !== -1 && lines[fromIdx+1]) ? lines[fromIdx+1] : "";
         document.getElementById('inFrom').value = fromVal;
@@ -112,24 +108,29 @@
         const toVal = (toIdx !== -1 && lines[toIdx+1]) ? lines[toIdx+1] : "";
         document.getElementById('inTo').value = toVal;
         
-        // 4. ASIAKAS
         const nIdx = lines.findIndex(l => l.toLowerCase().includes('kyytiin') || l.toLowerCase().includes('tilaaja'));
-        const nameVal = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1] : "";
+        let nameVal = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1] : "";
+        // Poistetaan puhelinnumero nimestä jos se on samalla rivillä
+        nameVal = nameVal.replace(/\+?\d[\d\s-]{7,}/, '').trim();
         document.getElementById('inNimi').value = nameVal;
 
-        // 5. LASKU
         const bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
-        const billVal = (bIdx !== -1 && lines[bIdx+1]) ? lines[bIdx+1] : "—";
+        let billVal = (bIdx !== -1 && lines[bIdx+1]) ? lines[bIdx+1] : "—";
+        if (billVal.toLowerCase().includes('ok?')) billVal = "—";
         document.getElementById('inLasku').value = billVal;
 
-        // 6. HUOMIOT (Kaikki muu "roska" mikä jää yli)
+        const phoneMatch = txt.match(/(\+?\d[\d\s-]{8,15})/);
+        const hintaMatch = txt.match(/(\d{1,3})\s*[e€]/i);
+
         let otherLines = lines.filter(l => 
             l !== fromVal && l !== toVal && l !== nameVal && l !== billVal &&
             !l.toLowerCase().includes('lähtö') && !l.toLowerCase().includes('meno') &&
             !l.toLowerCase().includes('kyytiin') && !l.toLowerCase().includes('lasku') &&
             !l.toLowerCase().includes('huomenna') && !l.toLowerCase().includes('klo') &&
             !l.match(/(\d{1,2})\.(\d{1,2})/) && !l.match(/(\d{1,2})[.:](\d{2})/) &&
-            !l.toLowerCase().includes('ok?') && l.length > 2
+            !l.toLowerCase().includes('ok?') && l.length > 2 &&
+            (!phoneMatch || !l.includes(phoneMatch[0])) &&
+            (!hintaMatch || !l.includes(hintaMatch[0]))
         );
         document.getElementById('inHuomio').value = otherLines.join(' ');
     };
@@ -206,7 +207,7 @@
             customer: document.getElementById('inNimi').value,
             billing: document.getElementById('inLasku').value,
             notes: document.getElementById('inHuomio').value,
-            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '—') : (txt.match(/(\d[\d\s-]{8,15})/)?.[0] || '—')
+            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '—') : (txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '—')
         };
 
         if(editId) {
