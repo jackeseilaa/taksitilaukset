@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V32.3</title>
+    <title>Kuljetuskirja V32.4</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -15,35 +15,26 @@
         body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 15px; }
         .v-tag { color: var(--muted); font-size: 10px; text-align: center; margin-bottom: 10px; }
         h1 { font-family: 'Syne', sans-serif; font-size: 1.1rem; text-align: center; color: var(--accent); margin-bottom: 20px; text-transform: uppercase; }
-        
-        #app-content { display: block; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 0.7rem; color: var(--muted); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-        
-        textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 140px; outline: none; font-size: 0.9rem; }
-        .btn-add { background: var(--accent); color: black; width: 100%; padding: 16px; border-radius: 8px; font-weight: bold; border: none; margin-bottom: 10px; cursor: pointer; font-size: 1.1rem; }
+        textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 160px; outline: none; font-size: 0.9rem; border-left: 4px solid var(--accent); }
+        .btn-add { background: var(--accent); color: black; width: 100%; padding: 18px; border-radius: 8px; font-weight: bold; border: none; margin-bottom: 15px; cursor: pointer; font-size: 1.1rem; text-transform: uppercase; }
         .btn-update { background: var(--edit) !important; color: white !important; }
-        
         .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
         table { width: 100%; border-collapse: collapse; font-size: 0.75rem; min-width: 900px; }
         th { text-align: left; color: var(--accent2); padding: 12px; border-bottom: 1px solid var(--border); background: #222; }
-        td { padding: 12px; border-bottom: 1px solid #222; vertical-align: top; }
-
-        /* PÄIVÄVIIVA: Vain kun päivä vaihtuu */
-        .day-separator { border-top: 5px solid var(--accent2) !important; }
-        
+        td { padding: 12px; border-bottom: 1px solid #222; vertical-align: top; line-height: 1.4; }
+        .day-separator { border-top: 4px solid var(--accent2) !important; }
         .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
-        .row-future b, .row-future small { color: #000 !important; }
+        .row-future b, .row-future small, .row-future .price-text { color: #000 !important; }
         .row-past { opacity: 0.7; }
-        
-        .price-text { font-weight: bold; color: var(--accent); }
-        .row-future .price-text { color: #000; border: 1px solid #000; padding: 2px 5px; border-radius: 4px; }
-        .action-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 5px; }
+        .price-text { font-weight: bold; color: var(--accent); border: 1px solid rgba(200,240,80,0.3); padding: 1px 4px; border-radius: 3px; }
+        .action-btn { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 5px; margin-left: 5px; }
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 32.3 (PVM FIX)</div>
+    <div class="v-tag">VERSIO 32.4</div>
     <div id="app-content">
-        <h1 id="form-header">KULJETUSKIRJA</h1>
+        <h1 id="form-header">KULJETUSKIRJA 2026</h1>
         <textarea id="msgInput" placeholder="Liitä viesti tähän..."></textarea>
         <button class="btn-add" id="btnAdd">TALLENNA TILAUS</button>
         <div class="table-wrapper">
@@ -59,7 +50,6 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
@@ -72,45 +62,38 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    const auth = getAuth(app);
 
     let currentLogs = [];
     let editId = null;
 
     function startListening() {
-        const q = query(collection(db, "taksitulot"));
-        onSnapshot(q, (snapshot) => {
+        onSnapshot(query(collection(db, "taksitulot")), (snapshot) => {
             const tbody = document.getElementById('tbody');
             tbody.innerHTML = '';
             currentLogs = [];
-            const now = Date.now();
+            snapshot.forEach(d => currentLogs.push({id: d.id, ...d.data()}));
 
-            snapshot.forEach(d => {
-                const r = d.data();
-                currentLogs.push({id: d.id, ...r});
-            });
-
-            // Tiukka lajittelu aikaleiman mukaan
+            // Lajittelu: Uusin driveTimestamp ensin
             currentLogs.sort((a, b) => (b.driveTimestamp || 0) - (a.driveTimestamp || 0));
 
-            let lastDateStr = "";
+            let lastDate = "";
+            const now = Date.now();
+
             currentLogs.forEach(r => {
-                const isFuture = (r.driveTimestamp || 0) > (now - 7200000); // 2h marginaali
+                const isFuture = (r.driveTimestamp || 0) > (now - 3600000 * 3); // 3h puskuri
                 const rowClass = isFuture ? 'row-future' : 'row-past';
-                
-                // Viiva jos päivämääräteksti muuttuu
-                let separator = (lastDateStr !== "" && r.date !== lastDateStr) ? "day-separator" : "";
-                lastDateStr = r.date;
+                let separator = (lastDate !== "" && r.date !== lastDate) ? "day-separator" : "";
+                lastDate = r.date;
 
                 const tr = document.createElement('tr');
                 tr.className = `${rowClass} ${separator}`;
                 tr.innerHTML = `
-                    <td><b>${r.date || '—'}</b><br>${r.time || '—'}</td>
-                    <td><small>N:</small> ${r.from || '—'}<br><small>K:</small> ${r.to || '—'}</td>
-                    <td>${r.customer || '—'}<br><small>${r.phone || '—'}</small></td>
-                    <td><span class="price-text">${r.price || '0'}€</span><br><small>${r.type || 'Normaali'}</small></td>
-                    <td>${r.billing || '—'}<br><small>${r.booker || '—'}</small></td>
-                    <td><small>${r.notes || '—'}</small></td>
+                    <td><b>${r.date}</b><br>${r.time}</td>
+                    <td><small>N:</small> ${r.from}<br><small>K:</small> ${r.to}</td>
+                    <td>${r.customer}<br><small>${r.phone}</small></td>
+                    <td><span class="price-text">${r.price}€</span><br><small>${r.type}</small></td>
+                    <td>${r.billing}<br><small>${r.booker}</small></td>
+                    <td><small>${r.notes}</small></td>
                     <td>
                         <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
                         <button class="action-btn" onclick="window.deleteItem('${r.id}')">✕</button>
@@ -138,41 +121,42 @@
     document.getElementById('btnAdd').onclick = async () => {
         const text = document.getElementById('msgInput').value;
         if(!text) return;
-        const lines = text.split('\n').map(l => l.trim());
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
-        const getVal = (keywords) => {
-            for (let line of lines) {
-                if (keywords.some(k => line.toLowerCase().includes(k.toLowerCase()))) {
-                    if (line.includes(':')) return line.split(':').slice(1).join(':').trim();
-                    return line;
-                }
-            }
-            return '—';
+        const findByKeys = (keys) => {
+            const line = lines.find(l => keys.some(k => l.toLowerCase().includes(k.toLowerCase())));
+            if (!line) return null;
+            return line.includes(':') ? line.split(':').slice(1).join(':').trim() : line;
         };
 
         const dateM = text.match(/(\d{1,2})\.(\d{1,2})/);
         const timeM = text.match(/(\d{1,2})[.:](\d{2})/);
-        
-        // Aikaleima vuodelle 2026
-        let dDate = new Date(2026, 3, 23); // Oletus tänään
-        if (dateM) {
-            dDate.setMonth(parseInt(dateM[2]) - 1);
-            dDate.setDate(parseInt(dateM[1]));
-        }
+        const phoneM = text.match(/(\+?\d[\d\s-]{7,15})/);
+        const priceM = text.match(/(?<!\d)(\d{1,3})\s*[e€]/i);
+
+        // HAKULOGIIKKA: Jos ei löydy avainsanalla, otetaan oletusriveiltä
+        let from = findByKeys(['Nouto', 'Lähtö']) || lines[2] || '—';
+        let to = findByKeys(['Kohde', 'Määränpää', 'Meno']) || lines[3] || '—';
+        let customer = findByKeys(['Nimi', 'Asiakas', 'Kyytiin', 'Matkustaja']) || lines[4] || '—';
+
+        // Siivotaan puhelinnumero pois nimestä jos se tarttui mukaan
+        if (phoneM) customer = customer.replace(phoneM[0], '').trim();
+
+        let dDate = new Date(2026, dateM ? parseInt(dateM[2])-1 : 3, dateM ? parseInt(dateM[1]) : 23);
         if (timeM) dDate.setHours(parseInt(timeM[1]), parseInt(timeM[2]), 0, 0);
 
         const data = {
             date: dateM ? dateM[0] : "—",
             time: timeM ? timeM[0] : "—",
-            from: getVal(['Nouto', 'Lähtö', 'Lento']),
-            to: getVal(['Kohde', 'Määränpää', 'Meno']),
-            customer: getVal(['Nimi', 'Asiakas', 'Kyytiin', 'Matkustaja']),
-            phone: text.match(/(\+?\d[\d\s-]{7,15})/)?.[0] || '—',
-            price: text.match(/(\d+)\s*[e€]/i)?.[1] || '0',
+            from: from,
+            to: to,
+            customer: customer,
+            phone: phoneM ? phoneM[0] : '—',
+            price: priceM ? priceM[1] : '0',
             type: text.toLowerCase().includes('vip') ? 'VIP' : 'Normaali',
             notes: lines.find(l => l.toLowerCase().includes('huomio') || l.toLowerCase().includes('odotus')) || '—',
-            billing: getVal(['Laskulle', 'Maksutapa']),
-            booker: getVal(['Tilaaja']),
+            billing: findByKeys(['Laskulle', 'Maksutapa']) || '—',
+            booker: findByKeys(['Tilaaja']) || '—',
             driveTimestamp: dDate.getTime()
         };
 
@@ -187,8 +171,7 @@
         document.getElementById('msgInput').value = '';
     };
 
-    onAuthStateChanged(auth, (user) => { if (user) startListening(); });
-    startListening(); // Varmistetaan käynnistys
+    startListening();
 </script>
 </body>
 </html>
