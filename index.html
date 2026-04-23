@@ -3,57 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V36.1</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
+    <title>Kuljetuskirja V36.2</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; --price-text: #0044ff; }
+        :root { 
+            --bg: #000000; 
+            --surface: #111111; 
+            --border: #333333; 
+            --accent: #c8f050; 
+            --accent2: #50c8f0; 
+            --text: #ffffff; 
+            --muted: #aaaaaa; 
+            --future-bg: #d4f8a0; 
+            --future-text: #000000; 
+            --price-bg: #ffff00; /* Kirkas keltainen */
+            --price-text: #000000; /* Musta teksti keltaisella */
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 10px; line-height: 1.4; }
-        .v-tag { color: var(--muted); font-size: 10px; text-align: center; margin-bottom: 5px; text-transform: uppercase; }
-        h1 { font-family: 'Syne', sans-serif; font-size: 1.1rem; text-align: center; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .v-tag { color: var(--muted); font-size: 11px; text-align: center; margin-bottom: 5px; font-weight: bold; }
+        h1 { font-family: 'Syne', sans-serif; font-size: 1.2rem; text-align: center; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
         
-        textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 100px; font-size: 0.9rem; border-left: 4px solid var(--accent); outline: none; }
+        textarea { width: 100%; background: var(--surface); border: 2px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 100px; font-size: 1rem; border-left: 6px solid var(--accent); outline: none; }
         
-        .manual-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; background: #222; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
-        .manual-fields input { background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; font-family: inherit; font-size: 0.85rem; width: 100%; outline: none; }
-        .manual-fields input:focus { border-color: var(--accent2); }
+        .manual-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; background: #1a1a1a; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+        .manual-fields input { background: #000; border: 1px solid #555; color: #fff; padding: 12px; border-radius: 4px; font-family: inherit; font-size: 0.9rem; width: 100%; }
+        .manual-fields input:focus { border-color: var(--accent); }
         .full-width { grid-column: span 2; }
-        label { font-size: 0.6rem; color: var(--accent2); text-transform: uppercase; margin-bottom: 2px; display: block; font-weight: bold; }
+        label { font-size: 0.7rem; color: var(--accent2); text-transform: uppercase; margin-bottom: 3px; display: block; font-weight: bold; }
         
         .btn-row { display: flex; gap: 8px; margin-bottom: 15px; }
-        .btn-add { background: var(--accent); color: black; flex: 2; padding: 18px; border-radius: 8px; font-weight: 800; border: none; cursor: pointer; font-size: 1rem; text-transform: uppercase; }
-        .btn-csv { background: #444; color: white; flex: 1; border-radius: 8px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+        .btn-add { background: var(--accent); color: black; flex: 2; padding: 20px; border-radius: 8px; font-weight: 900; border: none; cursor: pointer; font-size: 1.1rem; text-transform: uppercase; }
+        .btn-csv { background: #333; color: white; flex: 1; border-radius: 8px; border: 2px solid #444; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
         
-        .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); margin-top: 10px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.7rem; min-width: 1250px; }
-        th { text-align: left; color: var(--accent2); padding: 12px 10px; border-bottom: 1px solid var(--border); background: #222; text-transform: uppercase; }
-        td { padding: 10px; border-bottom: 1px solid #222; vertical-align: top; }
+        .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 1250px; }
+        th { text-align: left; color: #ffffff; padding: 15px 10px; border-bottom: 2px solid var(--accent); background: #000; text-transform: uppercase; font-weight: 900; }
+        td { padding: 12px 10px; border-bottom: 1px solid #333; vertical-align: top; }
         
         .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
-        .row-past { background-color: var(--surface) !important; color: var(--text) !important; opacity: 0.8; }
-        .price-tag { font-weight: bold; color: var(--price-text); border: 1px solid rgba(0,68,255,0.3); padding: 2px 5px; border-radius: 4px; background: rgba(255,255,255,0.9); }
-        .action-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--accent2); padding: 5px; }
+        .row-past { background-color: #111111 !important; color: #ffffff !important; }
+        
+        /* HINTA-TÄGI: MAKSIMAALINEN KONTRASTI */
+        .price-tag { 
+            font-weight: 900; 
+            color: var(--price-text); 
+            background: var(--price-bg); 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            display: inline-block;
+            font-size: 1rem;
+            box-shadow: 2px 2px 0px #000;
+        }
+
+        .action-btn { background: #222; border: 1px solid #444; font-size: 1.2rem; cursor: pointer; color: var(--accent2); padding: 8px; border-radius: 4px; margin-right: 5px; }
     </style>
 </head>
 <body>
 
-    <div class="v-tag">VERSIO 36.1 (CSV STABILITY FIX)</div>
+    <div class="v-tag">VERSIO 36.2 (MAX CONTRAST)</div>
     <h1>KULJETUSKIRJA</h1>
 
-    <textarea id="msgInput" placeholder="Liitä viesti tähän..." oninput="parseMessage()"></textarea>
+    <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
     
     <div class="manual-fields">
         <div><label>Pvm</label><input type="text" id="inPvm"></div>
         <div><label>Klo</label><input type="text" id="inKlo"></div>
-        <div><label>Hinta (€)</label><input type="text" id="inHinta"></div>
+        <div><label>Hinta (€)</label><input type="text" id="inHinta" style="background:#ffff00; color:#000; font-weight:bold;"></div>
         <div><label>Tyyppi</label><input type="text" id="inTyyppi"></div>
         <div class="full-width"><label>Lähtö</label><input type="text" id="inFrom"></div>
         <div class="full-width"><label>Meno</label><input type="text" id="inTo"></div>
         <div><label>Matkustaja</label><input type="text" id="inNimi"></div>
         <div><label>Tilaaja</label><input type="text" id="inTilaaja"></div>
-        <div class="full-width"><label>Lasku / Maksaja</label><input type="text" id="inLasku"></div>
+        <div class="full-width"><label>Lasku / Maksaja</label><input type="text" id="inLasku" style="background:#000; color:#c8f050; border: 1px solid #c8f050;"></div>
         <div class="full-width"><label>Huomio</label><input type="text" id="inHuomio"></div>
-        <div class="full-width"><label style="color:var(--edit)">Ajon aikaiset poikkeamat</label><input type="text" id="inPoikkeama"></div>
+        <div class="full-width"><label style="color:#f0a050">Ajon aikaiset poikkeamat</label><input type="text" id="inPoikkeama"></div>
     </div>
 
     <div class="btn-row">
@@ -65,13 +89,13 @@
         <table>
             <thead>
                 <tr>
-                    <th>Aika</th>
-                    <th>Reitti</th>
-                    <th>Matkustaja</th>
-                    <th>Tilaaja</th>
-                    <th>Hinta</th>
-                    <th>Lasku</th>
-                    <th>Huomio / Poikkeamat</th>
+                    <th>AIKA</th>
+                    <th>REITTI</th>
+                    <th>MATKUSTAJA</th>
+                    <th>TILAAJA</th>
+                    <th>HINTA</th>
+                    <th>LASKU</th>
+                    <th>HUOMIO / POIKKEAMAT</th>
                     <th></th>
                 </tr>
             </thead>
@@ -175,13 +199,13 @@
                 tr.className = rD >= today ? 'row-future' : 'row-past';
                 
                 tr.innerHTML = `
-                    <td><b>${r.date}</b><br>${r.time}</td>
-                    <td><small>N:</small> ${r.from}<br><small>K:</small> ${r.to}</td>
-                    <td><b>${r.customer}</b><br><small>${r.phone || ''}</small></td>
+                    <td><b style="font-size:1rem">${r.date}</b><br><b style="color:var(--accent2)">${r.time}</b></td>
+                    <td><b>${r.from}</b><br>⬇<br><b>${r.to}</b></td>
+                    <td><b style="font-size:0.9rem; color:#fff">${r.customer}</b><br><small>${r.phone || ''}</small></td>
                     <td>${r.orderer || '-'}</td>
-                    <td><span class="price-tag">${r.price}€</span><br><small>${r.type}</small></td>
-                    <td>${r.billing || 'Asiakas maksaa'}</td>
-                    <td><small><b>Huo:</b> ${r.notes || '-'}<br><b style="color:#d00">Poik:</b> ${r.deviation || '-'}</small></td>
+                    <td><span class="price-tag">${r.price}€</span><br><b>${r.type}</b></td>
+                    <td><b style="color:var(--accent)">${r.billing || 'Asiakas maksaa'}</b></td>
+                    <td><small><b>HUO:</b> ${r.notes || '-'}<br><b style="color:#ff4444">POIK:</b> ${r.deviation || '-'}</small></td>
                     <td>
                         <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
                         <button class="action-btn" onclick="window.del('${r.id}')">✕</button>
@@ -193,7 +217,6 @@
         });
     }
 
-    // CSV-SUOJAUS: Poistaa puolipisteet ja rivinvaihdot
     const cleanCSV = (str) => {
         if (!str) return "";
         return str.toString().replace(/;/g, ',').replace(/(\r\n|\n|\r)/gm, " ").trim();
