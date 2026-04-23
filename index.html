@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V31.9</title>
+    <title>Kuljetuskirja V32.0</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -29,14 +29,14 @@
         .day-separator { border-top: 2px solid var(--accent2) !important; }
         .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
         .row-future b, .row-future small { color: #000 !important; }
-        .row-past { opacity: 0.5; filter: grayscale(1); }
+        .row-past { opacity: 0.6; filter: grayscale(0.5); }
         .price-text { color: var(--accent); font-weight: bold; }
         .row-future .price-text { color: #000; border: 1px solid #000; padding: 1px 4px; border-radius: 4px; }
         .action-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 5px 10px; }
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 31.9</div>
+    <div class="v-tag">VERSIO 32.0</div>
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
         <button class="btn-login" id="btnLogin">KIRJAUDU GOOGLE-TUNNUKSELLA</button>
@@ -46,8 +46,8 @@
             <span id="userEmail"></span>
             <button id="btnLogout" style="background:none; color:inherit; border:none; text-decoration:underline;">Ulos</button>
         </div>
-        <h1>UUSI TILAUS</h1>
-        <textarea id="msgInput" placeholder="Liitä viesti (Lähtö, Nouto, Lento...)..."></textarea>
+        <h1 id="form-header">UUSI TILAUS</h1>
+        <textarea id="msgInput" placeholder="Liitä tai muokkaa viestiä..."></textarea>
         <button class="btn-add" id="btnAdd">TALLENNA TILAUS</button>
         <div class="table-wrapper">
             <table>
@@ -110,7 +110,7 @@
                 currentLogs.push({id: d.id, ...r});
             });
 
-            // Tiukka lajittelu aikaleiman mukaan (tulevat ensin, sitten menneet)
+            // Lajittelu: Tulevat ylimpänä, menneet alla. Puuttuvat aikaleimat hännille.
             currentLogs.sort((a, b) => (b.driveTimestamp || 0) - (a.driveTimestamp || 0));
 
             currentLogs.forEach(r => {
@@ -131,8 +131,8 @@
                     <td>${r.billing}<br><small>${r.booker}</small></td>
                     <td><small>${r.notes}</small></td>
                     <td>
-                        <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
-                        <button class="action-btn" onclick="window.deleteItem('${r.id}')">✕</button>
+                        <button class="action-btn" onclick="window.prepareEdit('${r.id}')" style="color:var(--edit)">✎</button>
+                        <button class="action-btn" onclick="window.deleteItem('${r.id}')" style="color:#f05050">✕</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -147,11 +147,12 @@
         document.getElementById('msgInput').value = `Pvm: ${item.date}\nKlo: ${item.time}\nNouto: ${item.from}\nKohde: ${item.to}\nAsiakas: ${item.customer}\nPuh: ${item.phone}\nHinta: ${item.price}\nTyyppi: ${item.type}\nLaskulle: ${item.billing}\nTilaaja: ${item.booker}\nHuomio: ${item.notes}`;
         document.getElementById('btnAdd').innerText = "PÄIVITÄ TILAUS";
         document.getElementById('btnAdd').classList.add('btn-update');
+        document.getElementById('form-header').innerText = "MUOKKAA TILAUSTA";
         window.scrollTo(0,0);
     };
 
     window.deleteItem = (id) => {
-        if(confirm("Poistetaanko?")) deleteDoc(doc(db, "taksitulot", id));
+        if(confirm("Poistetaanko tämä tilaus lopullisesti?")) deleteDoc(doc(db, "taksitulot", id));
     };
 
     document.getElementById('btnAdd').onclick = async () => {
@@ -159,53 +160,276 @@
         if(!text) return;
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
-        const getSmartVal = (keywords) => {
+        const getVal = (keywords) => {
             const i = lines.findIndex(l => keywords.some(k => l.toLowerCase().includes(k.toLowerCase())));
             if (i === -1) return '—';
             return lines[i].includes(':') ? lines[i].split(':').slice(1).join(':').trim() : (lines[i+1] || '—');
         };
 
-        const flightMatch = text.match(/([A-Z]{2,3}\s?\d{1,4})/i);
         const dateMatch = text.match(/(\d{1,2})\.(\d{1,2})/);
         const timeMatch = text.match(/(\d{1,2})[.:](\d{2})/);
-
-        let driveDate = new Date();
-        if (text.toLowerCase().includes('huomenna')) driveDate.setDate(driveDate.getDate() + 1);
-        if (dateMatch) { 
-            driveDate.setDate(parseInt(dateMatch[1])); 
-            driveDate.setMonth(parseInt(dateMatch[2]) - 1); 
+        
+        // Luodaan tarkka aikaleima lajittelua varten
+        let dDate = new Date();
+        if (dateMatch) {
+            dDate.setDate(parseInt(dateMatch[1]));
+            dDate.setMonth(parseInt(dateMatch[2]) - 1);
         }
-        if (timeMatch) driveDate.setHours(parseInt(timeMatch[1]), parseInt(timeMatch[2]), 0);
-
-        let nouto = getSmartVal(['Lähtö', 'Nouto', 'Noutopaikka']);
-        if ((nouto === '—' || !nouto) && flightMatch) nouto = "Lento: " + flightMatch[0].toUpperCase();
+        if (timeMatch) {
+            dDate.setHours(parseInt(timeMatch[1]), parseInt(timeMatch[2]), 0, 0);
+        } else {
+            dDate.setHours(0,0,0,0);
+        }
 
         const data = {
-            date: dateMatch ? dateMatch[0] : (text.toLowerCase().includes('huomenna') ? 'Huomenna' : 'Tänään'),
-            time: timeMatch ? timeMatch[0] : '—',
-            from: nouto,
-            to: getSmartVal(['Meno', 'Kohde', 'Määränpää']),
-            customer: getSmartVal(['Nimi', 'Kyytiin', 'Matkustaja']).replace(/(\+?\d[\d\s]{6,14}\d)/, '').trim(),
+            date: dateMatch ? dateMatch[0] : "—",
+            time: timeMatch ? timeMatch[0] : "—",
+            from: getVal(['Nouto', 'Lähtö', 'Lento']),
+            to: getVal(['Kohde', 'Määränpää', 'Meno']),
+            customer: getVal(['Nimi', 'Asiakas', 'Kyytiin']).replace(/(\+?\d[\d\s]{6,14}\d)/, '').trim(),
             phone: text.match(/(\+?\d[\d\s]{6,14}\d)/)?.[0] || '—',
             price: text.match(/(\d+)\s*[e€]/i)?.[1] || '0',
             type: text.toLowerCase().includes('vip') ? 'VIP' : 'Normaali',
             notes: lines.find(l => l.toLowerCase().includes('odotus') || l.toLowerCase().includes('huomio')) || '—',
-            billing: getSmartVal(['Laskulle', 'Maksutapa']),
-            booker: getSmartVal(['Tilaaja']).replace(/[\/]/g, '').trim(),
-            driveTimestamp: driveDate.getTime(),
+            billing: getVal(['Laskulle', 'Maksutapa']),
+            booker: getVal(['Tilaaja']).replace(/[\/]/g, '').trim(),
+            driveTimestamp: dDate.getTime(),
             updatedAt: serverTimestamp()
         };
 
-        if(editId) {
-            await updateDoc(doc(db, "taksitulot", editId), data);
-            editId = null;
-            document.getElementById('btnAdd').innerText = "TALLENNA TILAUS";
-            document.getElementById('btnAdd').classList.remove('btn-update');
-        } else {
-            data.createdAt = serverTimestamp();
-            await addDoc(collection(db, "taksitulot"), data);
+        try {
+            if(editId) {
+                await updateDoc(doc(db, "taksitulot", editId), data);
+                editId = null;
+                document.getElementById('btnAdd').innerText = "TALLENNA TILAUS";
+                document.getElementById('btnAdd').classList.remove('btn-update');
+                document.getElementById('form-header').innerText = "UUSI TILAUS";
+            } else {
+                data.createdAt = serverTimestamp();
+                await addDoc(collection(db, "taksitulot"), data);
+            }
+            document.getElementById('msgInput').value = '';
+        } catch (e) {
+            alert("Tallennus epäonnistui: " + e.message);
         }
-        document.getElementById('msgInput').value = '';
+    };
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kuljetuskirja V32.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
+    <style>
+        :root { 
+            --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; 
+            --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; 
+            --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 15px; }
+        .v-tag { color: var(--muted); font-size: 10px; text-align: center; margin-bottom: 10px; }
+        h1 { font-family: 'Syne', sans-serif; font-size: 1.1rem; text-align: center; color: var(--accent); margin-bottom: 20px; text-transform: uppercase; }
+        #auth-section { text-align: center; padding: 80px 20px; display: none; }
+        .btn-login { background: white; color: black; padding: 18px 30px; border-radius: 50px; font-weight: bold; border: none; cursor: pointer; }
+        #app-content { display: none; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 0.7rem; color: var(--muted); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 140px; outline: none; font-size: 0.9rem; }
+        .btn-add { background: var(--accent); color: black; width: 100%; padding: 16px; border-radius: 8px; font-weight: bold; border: none; margin-bottom: 10px; cursor: pointer; font-size: 1.1rem; }
+        .btn-update { background: var(--edit) !important; color: white !important; }
+        .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.7rem; min-width: 850px; }
+        th { text-align: left; color: var(--accent2); padding: 10px; border-bottom: 1px solid var(--border); background: #222; }
+        td { padding: 10px; border-bottom: 1px solid #222; vertical-align: top; }
+        .day-separator { border-top: 2px solid var(--accent2) !important; }
+        .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
+        .row-future b, .row-future small { color: #000 !important; }
+        .row-past { opacity: 0.6; filter: grayscale(0.5); }
+        .price-text { color: var(--accent); font-weight: bold; }
+        .row-future .price-text { color: #000; border: 1px solid #000; padding: 1px 4px; border-radius: 4px; }
+        .action-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 5px 10px; }
+    </style>
+</head>
+<body>
+    <div class="v-tag">VERSIO 32.0</div>
+    <div id="auth-section">
+        <h1>KULJETUSKIRJA</h1>
+        <button class="btn-login" id="btnLogin">KIRJAUDU GOOGLE-TUNNUKSELLA</button>
+    </div>
+    <div id="app-content">
+        <div class="top-bar">
+            <span id="userEmail"></span>
+            <button id="btnLogout" style="background:none; color:inherit; border:none; text-decoration:underline;">Ulos</button>
+        </div>
+        <h1 id="form-header">UUSI TILAUS</h1>
+        <textarea id="msgInput" placeholder="Liitä tai muokkaa viestiä..."></textarea>
+        <button class="btn-add" id="btnAdd">TALLENNA TILAUS</button>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Pvm/Klo</th><th>Nouto/Kohde</th><th>Asiakas/Puh</th><th>Hinta</th><th>Lasku/Tilaaja</th><th>Huomio</th><th></th></tr>
+                </thead>
+                <tbody id="tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs",
+        authDomain: "jsailing-f716c.firebaseapp.com",
+        projectId: "jsailing-f716c",
+        storageBucket: "jsailing-f716c.firebasestorage.app",
+        messagingSenderId: "543523103696",
+        appId: "1:543523103696:web:439a312efa6aec398a8fd5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    let currentLogs = [];
+    let editId = null;
+
+    onAuthStateChanged(auth, (user) => {
+        if (user && user.email === "jacke.seilaa@gmail.com") {
+            document.getElementById('auth-section').style.display = 'none';
+            document.getElementById('app-content').style.display = 'block';
+            document.getElementById('userEmail').innerText = user.email;
+            startListening();
+        } else {
+            document.getElementById('auth-section').style.display = 'block';
+            document.getElementById('app-content').style.display = 'none';
+        }
+    });
+
+    document.getElementById('btnLogin').onclick = () => signInWithPopup(auth, provider);
+    document.getElementById('btnLogout').onclick = () => signOut(auth);
+
+    function startListening() {
+        const q = query(collection(db, "taksitulot"));
+        onSnapshot(q, (snapshot) => {
+            const tbody = document.getElementById('tbody');
+            tbody.innerHTML = '';
+            currentLogs = [];
+            const now = Date.now();
+            let lastDateStr = "";
+
+            snapshot.forEach(d => {
+                const r = d.data();
+                currentLogs.push({id: d.id, ...r});
+            });
+
+            // Lajittelu: Tulevat ylimpänä, menneet alla. Puuttuvat aikaleimat hännille.
+            currentLogs.sort((a, b) => (b.driveTimestamp || 0) - (a.driveTimestamp || 0));
+
+            currentLogs.forEach(r => {
+                const isFuture = (r.driveTimestamp || 0) > now;
+                const rowClass = isFuture ? 'row-future' : 'row-past';
+                
+                const currentDateStr = r.date || "";
+                let separatorClass = (lastDateStr !== "" && currentDateStr !== lastDateStr) ? "day-separator" : "";
+                lastDateStr = currentDateStr;
+
+                const tr = document.createElement('tr');
+                tr.className = `${rowClass} ${separatorClass}`;
+                tr.innerHTML = `
+                    <td><b>${r.date || ''}</b><br>${r.time || ''}</td>
+                    <td><small>N:</small> ${r.from}<br><small>K:</small> ${r.to}</td>
+                    <td>${r.customer}<br><small>${r.phone}</small></td>
+                    <td><span class="price-text">${r.price}€</span><br><small>${r.type}</small></td>
+                    <td>${r.billing}<br><small>${r.booker}</small></td>
+                    <td><small>${r.notes}</small></td>
+                    <td>
+                        <button class="action-btn" onclick="window.prepareEdit('${r.id}')" style="color:var(--edit)">✎</button>
+                        <button class="action-btn" onclick="window.deleteItem('${r.id}')" style="color:#f05050">✕</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        });
+    }
+
+    window.prepareEdit = (id) => {
+        const item = currentLogs.find(l => l.id === id);
+        if(!item) return;
+        editId = id;
+        document.getElementById('msgInput').value = `Pvm: ${item.date}\nKlo: ${item.time}\nNouto: ${item.from}\nKohde: ${item.to}\nAsiakas: ${item.customer}\nPuh: ${item.phone}\nHinta: ${item.price}\nTyyppi: ${item.type}\nLaskulle: ${item.billing}\nTilaaja: ${item.booker}\nHuomio: ${item.notes}`;
+        document.getElementById('btnAdd').innerText = "PÄIVITÄ TILAUS";
+        document.getElementById('btnAdd').classList.add('btn-update');
+        document.getElementById('form-header').innerText = "MUOKKAA TILAUSTA";
+        window.scrollTo(0,0);
+    };
+
+    window.deleteItem = (id) => {
+        if(confirm("Poistetaanko tämä tilaus lopullisesti?")) deleteDoc(doc(db, "taksitulot", id));
+    };
+
+    document.getElementById('btnAdd').onclick = async () => {
+        const text = document.getElementById('msgInput').value;
+        if(!text) return;
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        
+        const getVal = (keywords) => {
+            const i = lines.findIndex(l => keywords.some(k => l.toLowerCase().includes(k.toLowerCase())));
+            if (i === -1) return '—';
+            return lines[i].includes(':') ? lines[i].split(':').slice(1).join(':').trim() : (lines[i+1] || '—');
+        };
+
+        const dateMatch = text.match(/(\d{1,2})\.(\d{1,2})/);
+        const timeMatch = text.match(/(\d{1,2})[.:](\d{2})/);
+        
+        // Luodaan tarkka aikaleima lajittelua varten
+        let dDate = new Date();
+        if (dateMatch) {
+            dDate.setDate(parseInt(dateMatch[1]));
+            dDate.setMonth(parseInt(dateMatch[2]) - 1);
+        }
+        if (timeMatch) {
+            dDate.setHours(parseInt(timeMatch[1]), parseInt(timeMatch[2]), 0, 0);
+        } else {
+            dDate.setHours(0,0,0,0);
+        }
+
+        const data = {
+            date: dateMatch ? dateMatch[0] : "—",
+            time: timeMatch ? timeMatch[0] : "—",
+            from: getVal(['Nouto', 'Lähtö', 'Lento']),
+            to: getVal(['Kohde', 'Määränpää', 'Meno']),
+            customer: getVal(['Nimi', 'Asiakas', 'Kyytiin']).replace(/(\+?\d[\d\s]{6,14}\d)/, '').trim(),
+            phone: text.match(/(\+?\d[\d\s]{6,14}\d)/)?.[0] || '—',
+            price: text.match(/(\d+)\s*[e€]/i)?.[1] || '0',
+            type: text.toLowerCase().includes('vip') ? 'VIP' : 'Normaali',
+            notes: lines.find(l => l.toLowerCase().includes('odotus') || l.toLowerCase().includes('huomio')) || '—',
+            billing: getVal(['Laskulle', 'Maksutapa']),
+            booker: getVal(['Tilaaja']).replace(/[\/]/g, '').trim(),
+            driveTimestamp: dDate.getTime(),
+            updatedAt: serverTimestamp()
+        };
+
+        try {
+            if(editId) {
+                await updateDoc(doc(db, "taksitulot", editId), data);
+                editId = null;
+                document.getElementById('btnAdd').innerText = "TALLENNA TILAUS";
+                document.getElementById('btnAdd').classList.remove('btn-update');
+                document.getElementById('form-header').innerText = "UUSI TILAUS";
+            } else {
+                data.createdAt = serverTimestamp();
+                await addDoc(collection(db, "taksitulot"), data);
+            }
+            document.getElementById('msgInput').value = '';
+        } catch (e) {
+            alert("Tallennus epäonnistui: " + e.message);
+        }
     };
 </script>
 </body>
