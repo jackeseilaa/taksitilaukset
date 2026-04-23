@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V33.0</title>
+    <title>Kuljetuskirja V33.1</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -15,65 +15,45 @@
         body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 10px; }
         .v-tag { color: var(--muted); font-size: 10px; text-align: center; margin-bottom: 5px; }
         h1 { font-family: 'Syne', sans-serif; font-size: 1.2rem; text-align: center; color: var(--accent); margin-bottom: 15px; text-transform: uppercase; }
-        
         #auth-section { text-align: center; padding: 100px 20px; }
         .btn-login { background: white; color: black; padding: 18px 30px; border-radius: 50px; font-weight: bold; border: none; cursor: pointer; }
-        
         #app-content { display: none; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.7rem; color: var(--muted); }
-        
         textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 120px; outline: none; font-size: 0.9rem; border-left: 4px solid var(--accent); }
-        
-        /* Muokkauspaneeli */
         .edit-fields { display: none; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; background: #222; padding: 10px; border-radius: 8px; border: 1px solid var(--edit); }
         .edit-fields input { background: #000; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 4px; font-family: inherit; font-size: 0.8rem; }
-
         .btn-add { background: var(--accent); color: black; width: 100%; padding: 18px; border-radius: 8px; font-weight: 800; border: none; margin-bottom: 15px; cursor: pointer; font-size: 1.1rem; }
         .btn-update { background: var(--edit) !important; color: white !important; }
-        
         .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
         table { width: 100%; border-collapse: collapse; font-size: 0.75rem; min-width: 950px; }
-        th { text-align: left; color: var(--accent2); padding: 12px; border-bottom: 1px solid var(--border); background: #222; text-transform: uppercase; }
+        th { text-align: left; color: var(--accent2); padding: 12px; border-bottom: 1px solid var(--border); background: #222; }
         td { padding: 12px; border-bottom: 1px solid #222; vertical-align: top; line-height: 1.4; }
-
         .day-separator { border-top: 5px solid var(--accent2) !important; }
         .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
-        .row-future b, .row-future small { color: #000 !important; }
         .row-past { opacity: 0.6; }
-        
         .price-tag { font-weight: bold; color: var(--accent); border: 1px solid rgba(200,240,80,0.3); padding: 2px 4px; border-radius: 4px; }
-        .row-future .price-tag { color: #000; border-color: #000; }
-        .year-tag { font-size: 0.65rem; color: var(--accent2); opacity: 0.8; }
         .action-btn { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 4px; }
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 33.0 (VUOSI-VISUAL)</div>
-
+    <div class="v-tag">VERSIO 33.1 (LASKETTU-SORT)</div>
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
         <button class="btn-login" id="btnLogin">KIRJAUDU SISÄÄN</button>
     </div>
-
     <div id="app-content">
         <div class="top-bar"><span id="userEmail"></span><button id="btnLogout" style="background:none; color:inherit; border:none; text-decoration:underline;">Ulos</button></div>
-        
-        <textarea id="msgInput" placeholder="Liitä WhatsApp-viesti tähän..."></textarea>
-        
+        <textarea id="msgInput" placeholder="Liitä WhatsApp-viesti..."></textarea>
         <div id="editFields" class="edit-fields">
             <input type="text" id="editDate" placeholder="Pvm (esim. 23.4.)">
             <input type="text" id="editYear" placeholder="Vuosi (esim. 2026)">
             <input type="text" id="editTime" placeholder="Klo">
             <input type="text" id="editPrice" placeholder="Hinta">
         </div>
-
         <button class="btn-add" id="btnAdd">TALLENNA TILAUS</button>
-        
         <div class="table-wrapper">
             <table>
-                <thead>
-                    <tr><th>Päivämäärä</th><th>Nouto / Kohde</th><th>Asiakas</th><th>Hinta</th><th>Lasku</th><th>Huomio</th><th></th></tr>
-                </thead>
+                <thead><tr><th>Pvm/Klo</th><th>Nouto / Kohde</th><th>Asiakas</th><th>Hinta</th><th>Lasku</th><th>Huomio</th><th></th></tr></thead>
                 <tbody id="tbody"></tbody>
             </table>
         </div>
@@ -123,19 +103,25 @@
             currentLogs = [];
             snapshot.forEach(d => currentLogs.push({id: d.id, ...d.data()}));
 
-            // LAJITTELU: Ensisijaisesti aikaleiman mukaan (Uusin/Tuleva ylimpänä)
-            currentLogs.sort((a, b) => (b.driveTimestamp || 0) - (a.driveTimestamp || 0));
+            // UUSI LAJITTELU: Luodaan vertailukelpoinen merkkijono YYYY-MM-DD-HH:MM
+            currentLogs.sort((a, b) => {
+                const getSortKey = (item) => {
+                    const [d, m] = (item.date || "01.01.").split('.');
+                    const y = item.year || "2026";
+                    const t = (item.time || "00:00").replace('.', ':');
+                    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}-${t}`;
+                };
+                return getSortKey(b).localeCompare(getSortKey(a));
+            });
 
             let lastDateStr = "";
-            const now = Date.now();
+            const now = new Date();
+            const todayStr = `${now.getDate()}.${now.getMonth()+1}.`;
 
             currentLogs.forEach(r => {
-                const isFuture = (r.driveTimestamp || 0) > (now - 7200000);
+                // Tunnistetaan tulevat ajot vertaamalla päivämäärää
+                const isFuture = r.date === todayStr || (parseInt(r.date.split('.')[1]) > now.getMonth()+1) || (parseInt(r.date.split('.')[1]) === now.getMonth()+1 && parseInt(r.date.split('.')[0]) >= now.getDate());
                 const rowClass = isFuture ? 'row-future' : 'row-past';
-                
-                // Näytetään vuosi päivämäärän alla
-                const dObj = new Date(r.driveTimestamp);
-                const displayYear = dObj.getFullYear() || "2026";
                 
                 let separator = (lastDateStr !== "" && r.date !== lastDateStr) ? "day-separator" : "";
                 lastDateStr = r.date;
@@ -143,11 +129,11 @@
                 const tr = document.createElement('tr');
                 tr.className = `${rowClass} ${separator}`;
                 tr.innerHTML = `
-                    <td><b>${r.date}</b><br><span class="year-tag">${displayYear}</span><br>${r.time}</td>
+                    <td><b>${r.date}${r.year ? r.year : ''}</b><br>${r.time}</td>
                     <td><small>N:</small> ${r.from}<br><small>K:</small> ${r.to}</td>
-                    <td>${r.customer}<br><small>${r.phone}</small></td>
+                    <td>${r.customer}<br><small>${r.phone || ''}</small></td>
                     <td><span class="price-tag">${r.price}€</span><br><small>${r.type}</small></td>
-                    <td>${r.billing}</td>
+                    <td>${r.billing || '—'}</td>
                     <td><small>${r.notes}</small></td>
                     <td>
                         <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
@@ -163,14 +149,11 @@
         const item = currentLogs.find(l => l.id === id);
         if(!item) return;
         editId = id;
-        
-        // Näytetään muokkauskentät
         document.getElementById('editFields').style.display = 'grid';
         document.getElementById('editDate').value = item.date;
-        document.getElementById('editYear').value = new Date(item.driveTimestamp).getFullYear();
+        document.getElementById('editYear').value = item.year || "2026";
         document.getElementById('editTime').value = item.time;
         document.getElementById('editPrice').value = item.price;
-        
         document.getElementById('msgInput').value = `Nouto: ${item.from}\nKohde: ${item.to}\nAsiakas: ${item.customer}\nPuh: ${item.phone}\nHuomio: ${item.notes}`;
         document.getElementById('btnAdd').innerText = "PÄIVITÄ TILAUS";
         document.getElementById('btnAdd').classList.add('btn-update');
@@ -182,22 +165,16 @@
     document.getElementById('btnAdd').onclick = async () => {
         const text = document.getElementById('msgInput').value;
         if(!text) return;
-        
         const lines = text.split('\n').map(l => l.trim());
         
-        // Jos ollaan muokkaustilassa, otetaan arvot kentistä
-        let pvm = editId ? document.getElementById('editDate').value : (text.match(/(\d{1,2})\.(\d{1,2})/) ? text.match(/(\d{1,2})\.(\d{1,2})/)[0] : "23.4.");
+        let pvm = editId ? document.getElementById('editDate').value : (text.match(/(\d{1,2})\.(\d{1,2})/) ? text.match(/(\d{1,2})\.(\d{1,2})/)[0] + "." : "23.4.");
         let vuosi = editId ? document.getElementById('editYear').value : "2026";
         let klo = editId ? document.getElementById('editTime').value : (text.match(/(\d{1,2})[.:](\d{2})/) ? text.match(/(\d{1,2})[.:](\d{2})/)[0] : "00:00");
         let hinta = editId ? document.getElementById('editPrice').value : (text.match(/(?<!\d)(\d{1,3})\s*[e€]/i) ? text.match(/(?<!\d)(\d{1,3})\s*[e€]/i)[1] : "0");
 
-        // Aikaleiman luonti
-        const [d, m] = pvm.split('.');
-        const [hh, mm] = klo.split(/[.:]/);
-        let dDate = new Date(parseInt(vuosi), parseInt(m)-1, parseInt(d), parseInt(hh)||0, parseInt(mm)||0);
-
         const data = {
             date: pvm,
+            year: vuosi,
             time: klo,
             from: lines.find(l => l.toLowerCase().includes('nouto') || l.toLowerCase().includes('lähtö'))?.split(':').pop().trim() || lines[0],
             to: lines.find(l => l.toLowerCase().includes('kohde') || l.toLowerCase().includes('meno'))?.split(':').pop().trim() || lines[1],
@@ -207,7 +184,7 @@
             type: text.toLowerCase().includes('vip') ? 'VIP' : 'Normaali',
             notes: lines.find(l => ['odotus','huomio','mittari'].some(k => l.toLowerCase().includes(k))) || '—',
             billing: text.toLowerCase().includes('lasku') ? 'Lasku' : '—',
-            driveTimestamp: dDate.getTime()
+            driveTimestamp: Date.now() // Käytetään vain muokkauksen seurantaan
         };
 
         if(editId) {
