@@ -3,40 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V36.0</title>
+    <title>Kuljetuskirja V36.1</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; --price-text: #0044ff; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 10px; }
-        .v-tag { color: var(--muted); font-size: 10px; text-align: center; margin-bottom: 5px; }
-        h1 { font-family: 'Syne', sans-serif; font-size: 1.1rem; text-align: center; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; }
+        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 10px; line-height: 1.4; }
+        .v-tag { color: var(--muted); font-size: 10px; text-align: center; margin-bottom: 5px; text-transform: uppercase; }
+        h1 { font-family: 'Syne', sans-serif; font-size: 1.1rem; text-align: center; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
         
-        textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 80px; font-size: 0.9rem; border-left: 4px solid var(--accent); }
+        textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 100px; font-size: 0.9rem; border-left: 4px solid var(--accent); outline: none; }
         
         .manual-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; background: #222; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
-        .manual-fields input { background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; font-family: inherit; font-size: 0.85rem; width: 100%; }
+        .manual-fields input { background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; font-family: inherit; font-size: 0.85rem; width: 100%; outline: none; }
+        .manual-fields input:focus { border-color: var(--accent2); }
         .full-width { grid-column: span 2; }
-        label { font-size: 0.6rem; color: var(--accent2); text-transform: uppercase; margin-bottom: 2px; display: block; }
+        label { font-size: 0.6rem; color: var(--accent2); text-transform: uppercase; margin-bottom: 2px; display: block; font-weight: bold; }
         
         .btn-row { display: flex; gap: 8px; margin-bottom: 15px; }
-        .btn-add { background: var(--accent); color: black; flex: 2; padding: 18px; border-radius: 8px; font-weight: 800; border: none; cursor: pointer; font-size: 1rem; }
-        .btn-csv { background: #444; color: white; flex: 1; border-radius: 8px; border: none; cursor: pointer; font-size: 0.8rem; }
+        .btn-add { background: var(--accent); color: black; flex: 2; padding: 18px; border-radius: 8px; font-weight: 800; border: none; cursor: pointer; font-size: 1rem; text-transform: uppercase; }
+        .btn-csv { background: #444; color: white; flex: 1; border-radius: 8px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
         
-        .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
-        table { width: 100%; border-collapse: collapse; font-size: 0.7rem; min-width: 1200px; }
-        th { text-align: left; color: var(--accent2); padding: 10px; border-bottom: 1px solid var(--border); background: #222; }
+        .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.7rem; min-width: 1250px; }
+        th { text-align: left; color: var(--accent2); padding: 12px 10px; border-bottom: 1px solid var(--border); background: #222; text-transform: uppercase; }
         td { padding: 10px; border-bottom: 1px solid #222; vertical-align: top; }
         
         .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
-        .row-past { background-color: var(--surface) !important; color: var(--text) !important; opacity: 0.7; }
-        .price-tag { font-weight: bold; color: var(--price-text); border: 1px solid rgba(0,68,255,0.4); padding: 2px 4px; border-radius: 4px; background: rgba(255,255,255,0.2); }
-        .action-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--accent2); padding: 2px; }
+        .row-past { background-color: var(--surface) !important; color: var(--text) !important; opacity: 0.8; }
+        .price-tag { font-weight: bold; color: var(--price-text); border: 1px solid rgba(0,68,255,0.3); padding: 2px 5px; border-radius: 4px; background: rgba(255,255,255,0.9); }
+        .action-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--accent2); padding: 5px; }
     </style>
 </head>
 <body>
 
-    <div class="v-tag">VERSIO 36.0 (INTERFACE CLEANUP)</div>
+    <div class="v-tag">VERSIO 36.1 (CSV STABILITY FIX)</div>
     <h1>KULJETUSKIRJA</h1>
 
     <textarea id="msgInput" placeholder="Liitä viesti tähän..." oninput="parseMessage()"></textarea>
@@ -63,7 +64,16 @@
     <div class="table-wrapper">
         <table>
             <thead>
-                <tr><th>Aika</th><th>Reitti</th><th>Matkustaja</th><th>Tilaaja</th><th>Hinta</th><th>Lasku</th><th>Huomio/Poik.</th><th></th></tr>
+                <tr>
+                    <th>Aika</th>
+                    <th>Reitti</th>
+                    <th>Matkustaja</th>
+                    <th>Tilaaja</th>
+                    <th>Hinta</th>
+                    <th>Lasku</th>
+                    <th>Huomio / Poikkeamat</th>
+                    <th></th>
+                </tr>
             </thead>
             <tbody id="logs"></tbody>
         </table>
@@ -101,15 +111,15 @@
         document.getElementById('inTyyppi').value = lowTxt.includes('vip') ? 'VIP' : 'Normaali';
         
         const fIdx = lines.findIndex(l => l.toLowerCase().match(/lähtö|nouto/));
-        const fromV = (fIdx !== -1) ? lines[fIdx+1] : "";
+        const fromV = (fIdx !== -1 && lines[fIdx+1]) ? lines[fIdx+1] : "";
         document.getElementById('inFrom').value = fromV;
 
         const tIdx = lines.findIndex(l => l.toLowerCase().match(/meno|kohde/));
-        const toV = (tIdx !== -1) ? lines[tIdx+1] : "";
+        const toV = (tIdx !== -1 && lines[tIdx+1]) ? lines[tIdx+1] : "";
         document.getElementById('inTo').value = toV;
         
         const nIdx = lines.findIndex(l => l.toLowerCase().match(/kyytiin/));
-        let passenger = (nIdx !== -1) ? lines[nIdx+1].replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim() : "";
+        let passenger = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1].replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim() : "";
         document.getElementById('inNimi').value = passenger;
 
         const sIdx = lines.findIndex(l => l.toLowerCase().match(/tilaaja|til:|tilaus/));
@@ -144,8 +154,8 @@
         onSnapshot(query(collection(db, "taksitulot")), (snap) => {
             const tbody = document.getElementById('logs');
             tbody.innerHTML = '';
-            
             currentLogs = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            
             currentLogs.sort((a,b) => {
                 const k = (i) => {
                     let p = (i.date || '01.01.2026').split('.');
@@ -183,10 +193,16 @@
         });
     }
 
+    // CSV-SUOJAUS: Poistaa puolipisteet ja rivinvaihdot
+    const cleanCSV = (str) => {
+        if (!str) return "";
+        return str.toString().replace(/;/g, ',').replace(/(\r\n|\n|\r)/gm, " ").trim();
+    };
+
     window.exportToCSV = () => {
         let csv = "\uFEFFPvm;Klo;Lahto;Meno;Matkustaja;Puhelin;Hinta;Tyyppi;Lasku;Tilaaja;Huomio;Poikkeamat\n";
         currentLogs.forEach(r => {
-            csv += `${r.date};${r.time};${r.from};${r.to};${r.customer};${r.phone || ''};${r.price};${r.type};${r.billing || 'Asiakas maksaa'};${r.orderer || ''};${r.notes || ''};${r.deviation || ''}\n`;
+            csv += `${cleanCSV(r.date)};${cleanCSV(r.time)};${cleanCSV(r.from)};${cleanCSV(r.to)};${cleanCSV(r.customer)};${cleanCSV(r.phone)};${cleanCSV(r.price)};${cleanCSV(r.type)};${cleanCSV(r.billing)};${cleanCSV(r.orderer)};${cleanCSV(r.notes)};${cleanCSV(r.deviation)}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
@@ -206,7 +222,7 @@
         document.getElementById('inTo').value = item.to;
         document.getElementById('inNimi').value = item.customer;
         document.getElementById('inTilaaja').value = item.orderer || "";
-        document.getElementById('inLasku').value = item.billing || "Asiakas maksaa";
+        document.getElementById('inLasku').value = item.billing || "";
         document.getElementById('inHuomio').value = item.notes;
         document.getElementById('inPoikkeama').value = item.deviation || "";
         window.scrollTo(0,0);
@@ -230,15 +246,17 @@
             billing: document.getElementById('inLasku').value,
             notes: document.getElementById('inHuomio').value,
             deviation: document.getElementById('inPoikkeama').value,
-            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '-') : cleanPhone
+            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '-') : (cleanPhone === '-' ? '-' : cleanPhone)
         };
+        
         if(editId) { await updateDoc(doc(db, "taksitulot", editId), data); editId = null; }
         else { await addDoc(collection(db, "taksitulot"), data); }
+        
         document.getElementById('msgInput').value = '';
         document.querySelectorAll('.manual-fields input').forEach(i => i.value = '');
     };
 
-    window.del = (id) => { if(confirm("Poista?")) deleteDoc(doc(db, "taksitulot", id)); };
+    window.del = (id) => { if(confirm("Poista tilaus pysyvästi?")) deleteDoc(doc(db, "taksitulot", id)); };
 </script>
 </body>
 </html>
