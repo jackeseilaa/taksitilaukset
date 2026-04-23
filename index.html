@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V34.9</title>
+    <title>Kuljetuskirja V35.1</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; --price-text: #0055ff; }
+        :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; --price-text: #0044ff; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 10px; }
         .v-tag { color: var(--muted); font-size: 10px; text-align: center; margin-bottom: 5px; }
@@ -17,18 +17,17 @@
         .full-width { grid-column: span 2; }
         label { font-size: 0.6rem; color: var(--accent2); text-transform: uppercase; margin-bottom: 2px; display: block; }
         .btn-add { background: var(--accent); color: black; width: 100%; padding: 18px; border-radius: 8px; font-weight: 800; border: none; margin-bottom: 15px; cursor: pointer; font-size: 1.1rem; }
-        .btn-update { background: var(--edit) !important; color: white !important; }
         .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
         table { width: 100%; border-collapse: collapse; font-size: 0.75rem; min-width: 950px; }
         th { text-align: left; color: var(--accent2); padding: 12px; border-bottom: 1px solid var(--border); background: #222; }
         td { padding: 12px; border-bottom: 1px solid #222; vertical-align: top; }
         .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
-        .price-tag { font-weight: bold; color: var(--price-text); border: 1px solid rgba(0,85,255,0.4); padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.1); }
+        .price-tag { font-weight: bold; color: var(--price-text); border: 1px solid rgba(0,68,255,0.4); padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.2); }
         .action-btn { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--accent2); padding: 4px; }
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 34.9 (PRICE & NOTE FIX)</div>
+    <div class="v-tag">VERSIO 35.1 (BILLING SEARCH FIX)</div>
 
     <div id="app-content">
         <h1>KULJETUSKIRJA</h1>
@@ -77,43 +76,52 @@
         const txt = document.getElementById('msgInput').value;
         const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
-        // PVM, KLO & HINTA
+        // PVM & KLO
         let pvmM = txt.match(/(\d{1,2})\.(\d{1,2})/);
         if (pvmM) document.getElementById('inPvm').value = pvmM[0].includes('2026') ? pvmM[0] : pvmM[0] + ".2026";
-        
-        const hintaMatch = txt.match(/(\d{1,3})\s*[e€]/i) || txt.match(/(\d{2,3})$/m);
-        const hintaVal = hintaMatch ? hintaMatch[1] : "";
-        document.getElementById('inHinta').value = hintaVal;
-        
         document.getElementById('inKlo').value = txt.match(/(\d{1,2})[.:](\d{2})/)?.[0] || "";
+        
+        // HINTA
+        const hintaMatch = txt.match(/(\d{1,3})\s*[e€]/i);
+        document.getElementById('inHinta').value = hintaMatch ? hintaMatch[1] : "";
         document.getElementById('inTyyppi').value = txt.toLowerCase().includes('vip') ? 'VIP' : 'Normaali';
         
         // REITIT
         const fIdx = lines.findIndex(l => l.toLowerCase().match(/lähtö|nouto/));
-        document.getElementById('inFrom').value = (fIdx !== -1) ? lines[fIdx+1] : "";
+        const fromV = (fIdx !== -1) ? lines[fIdx+1] : "";
+        document.getElementById('inFrom').value = fromV;
         const tIdx = lines.findIndex(l => l.toLowerCase().match(/meno|kohde/));
-        document.getElementById('inTo').value = (tIdx !== -1) ? lines[tIdx+1] : "";
+        const toV = (tIdx !== -1) ? lines[tIdx+1] : "";
+        document.getElementById('inTo').value = toV;
         
-        // ASIAKAS & PUHELIN (Puhdistus hinta-numerosta)
+        // NIMI
         const nIdx = lines.findIndex(l => l.toLowerCase().match(/kyytiin|tilaaja/));
-        let name = (nIdx !== -1) ? lines[nIdx+1] : "";
-        name = name.replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim();
-        document.getElementById('inNimi').value = name;
+        let rawName = (nIdx !== -1) ? lines[nIdx+1] : "";
+        let cleanName = rawName.replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim();
+        document.getElementById('inNimi').value = cleanName;
 
-        // LASKU
+        // LASKU - Etsitään sanaa "lasku"
         const bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
-        document.getElementById('inLasku').value = (bIdx !== -1) ? lines[bIdx+1] : "Asiakas maksaa";
+        let billVal = "—";
+        if (bIdx !== -1 && lines[bIdx+1] && !lines[bIdx+1].toLowerCase().includes('ok?')) {
+            billVal = lines[bIdx+1];
+        }
+        document.getElementById('inLasku').value = billVal;
 
-        // HUOMIO (Tiukka suodatin tekstille)
-        let ignored = [document.getElementById('inFrom').value, document.getElementById('inTo').value, name];
+        // HUOMIO
+        let ignoredLines = [fromV, toV, rawName, billVal];
         let notes = lines.filter(l => 
-            !ignored.includes(l) && 
+            !ignoredLines.includes(l) && 
             !l.toLowerCase().match(/lähtö|meno|kyytiin|lasku|huomenna|klo|ok\?/) &&
             !l.match(/(\d{1,2})\.(\d{1,2})/) &&
-            !l.match(/\+?\d[\d\s-]{7,}/) &&
-            l.length > 5
-        );
-        document.getElementById('inHuomio').value = notes.join(' ').replace(/\d{2,3}\s*[e€]/i, '').replace(/\//g, '').trim();
+            l.length > 3
+        ).join(' ');
+
+        // Puhdistetaan huomioista nimi ja vip-maininnat
+        if (cleanName.length > 2) {
+            notes = notes.replace(new RegExp(cleanName, 'gi'), '').replace(/vip/gi, '').replace(/\//g, '').replace(/\s\s+/g, ' ').trim();
+        }
+        document.getElementById('inHuomio').value = notes;
     };
 
     function startListening() {
@@ -128,14 +136,13 @@
                 };
                 return k(b).localeCompare(k(a));
             });
-
             currentLogs.forEach(r => {
                 const tr = document.createElement('tr');
                 tr.className = 'row-future';
                 tr.innerHTML = `
                     <td><b>${r.date || ''}</b><br>${r.time || ''}</td>
                     <td><small>N:</small> ${r.from || '—'}<br><small>K:</small> ${r.to || '—'}</td>
-                    <td>${r.customer || '—'}<br><small>${(r.phone||'').replace(r.price, '').trim()}</small></td>
+                    <td>${r.customer || '—'}<br><small>${r.phone||''}</small></td>
                     <td><span class="price-tag">${r.price || '0'}€</span><br><small>${r.type || ''}</small></td>
                     <td>${r.billing || '—'}</td>
                     <td><small>${r.notes || ''}</small></td>
@@ -162,35 +169,27 @@
         document.getElementById('inNimi').value = item.customer;
         document.getElementById('inHuomio').value = item.notes;
         document.getElementById('inLasku').value = item.billing;
-        document.getElementById('btnSave').innerText = "PÄIVITÄ TILAUS";
-        document.getElementById('btnSave').classList.add('btn-update');
         window.scrollTo(0,0);
     };
 
     document.getElementById('btnSave').onclick = async () => {
         const txt = document.getElementById('msgInput').value;
-        let rawPhone = txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '—';
-        const hinta = document.getElementById('inHinta').value;
-        let cleanPhone = rawPhone.replace(hinta, '').trim();
-
         const data = {
             date: document.getElementById('inPvm').value,
             time: document.getElementById('inKlo').value,
-            price: hinta,
+            price: document.getElementById('inHinta').value,
             type: document.getElementById('inTyyppi').value,
             from: document.getElementById('inFrom').value,
             to: document.getElementById('inTo').value,
             customer: document.getElementById('inNimi').value,
             billing: document.getElementById('inLasku').value,
             notes: document.getElementById('inHuomio').value,
-            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '—') : cleanPhone
+            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '—') : (txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '—')
         };
         if(editId) { await updateDoc(doc(db, "taksitulot", editId), data); editId = null; }
         else { await addDoc(collection(db, "taksitulot"), data); }
         document.getElementById('msgInput').value = '';
         document.querySelectorAll('.manual-fields input').forEach(i => i.value = '');
-        document.getElementById('btnSave').innerText = "TALLENNA TILAUS";
-        document.getElementById('btnSave').classList.remove('btn-update');
     };
 
     window.del = (id) => { if(confirm("Poista?")) deleteDoc(doc(db, "taksitulot", id)); };
