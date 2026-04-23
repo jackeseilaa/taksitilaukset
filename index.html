@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V35.6</title>
+    <title>Kuljetuskirja V35.7</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; --price-text: #0044ff; }
@@ -20,7 +20,7 @@
         .btn-add { background: var(--accent); color: black; flex: 2; padding: 18px; border-radius: 8px; font-weight: 800; border: none; cursor: pointer; font-size: 1rem; }
         .btn-csv { background: #444; color: white; flex: 1; border-radius: 8px; border: none; cursor: pointer; font-size: 0.8rem; }
         .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
-        table { width: 100%; border-collapse: collapse; font-size: 0.7rem; min-width: 1100px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.7rem; min-width: 1200px; }
         th { text-align: left; color: var(--accent2); padding: 10px; border-bottom: 1px solid var(--border); background: #222; }
         td { padding: 10px; border-bottom: 1px solid #222; vertical-align: top; }
         .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
@@ -30,7 +30,7 @@
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 35.6 (SMART BILLING KEYWORDS)</div>
+    <div class="v-tag">VERSIO 35.7 (FULL SPLIT & CLEANER)</div>
 
     <div id="app-content">
         <h1>KULJETUSKIRJA</h1>
@@ -46,7 +46,7 @@
             <div><label>Matkustaja</label><input type="text" id="inNimi"></div>
             <div><label>Tilaaja</label><input type="text" id="inTilaaja"></div>
             <div class="full-width"><label>Lasku / Maksaja</label><input type="text" id="inLasku"></div>
-            <div class="full-width"><label>Alkuperäinen huomio</label><input type="text" id="inHuomio"></div>
+            <div class="full-width"><label>Huomio</label><input type="text" id="inHuomio"></div>
             <div class="full-width"><label style="color:var(--edit)">Ajon aikaiset poikkeamat</label><input type="text" id="inPoikkeama"></div>
         </div>
 
@@ -58,7 +58,7 @@
         <div class="table-wrapper">
             <table>
                 <thead>
-                    <tr><th>Aika</th><th>Reitti</th><th>Matkustaja/Tilaaja</th><th>Hinta</th><th>Lasku</th><th>Huomio/Poik.</th><th></th></tr>
+                    <tr><th>Aika</th><th>Reitti</th><th>Matkustaja</th><th>Tilaaja</th><th>Hinta</th><th>Lasku</th><th>Huomio/Poik.</th><th></th></tr>
                 </thead>
                 <tbody id="logs"></tbody>
             </table>
@@ -87,28 +87,37 @@
         const lowTxt = txt.toLowerCase();
         const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
+        // PVM & KLO
         let pvmM = txt.match(/(\d{1,2})\.(\d{1,2})/);
         if (pvmM) document.getElementById('inPvm').value = pvmM[0].includes('2026') ? pvmM[0] : pvmM[0] + ".2026";
         document.getElementById('inKlo').value = txt.match(/(\d{1,2})[.:](\d{2})/)?.[0] || "";
         
+        // HINTA
         const hintaMatch = txt.match(/(\d{1,3})\s*[e€]/i);
-        document.getElementById('inHinta').value = hintaMatch ? hintaMatch[1] : "";
+        const hintaStr = hintaMatch ? hintaMatch[1] : "";
+        document.getElementById('inHinta').value = hintaStr;
         document.getElementById('inTyyppi').value = lowTxt.includes('vip') ? 'VIP' : 'Normaali';
         
+        // REITIT
         const fIdx = lines.findIndex(l => l.toLowerCase().match(/lähtö|nouto/));
-        document.getElementById('inFrom').value = (fIdx !== -1) ? lines[fIdx+1] : "";
+        const fromV = (fIdx !== -1) ? lines[fIdx+1] : "";
+        document.getElementById('inFrom').value = fromV;
 
         const tIdx = lines.findIndex(l => l.toLowerCase().match(/meno|kohde/));
-        document.getElementById('inTo').value = (tIdx !== -1) ? lines[tIdx+1] : "";
+        const toV = (tIdx !== -1) ? lines[tIdx+1] : "";
+        document.getElementById('inTo').value = toV;
         
+        // MATKUSTAJA
         const nIdx = lines.findIndex(l => l.toLowerCase().match(/kyytiin/));
-        let cleanName = (nIdx !== -1) ? lines[nIdx+1].replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim() : "";
-        document.getElementById('inNimi').value = cleanName;
+        let passenger = (nIdx !== -1) ? lines[nIdx+1].replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim() : "";
+        document.getElementById('inNimi').value = passenger;
 
+        // TILAAJA
         const sIdx = lines.findIndex(l => l.toLowerCase().match(/tilaaja|til:|tilaus/));
-        document.getElementById('inTilaaja').value = (sIdx !== -1) ? (lines[sIdx].split(':').length > 1 ? lines[sIdx].split(':')[1].trim() : lines[sIdx+1]) : "";
+        let ordererVal = (sIdx !== -1) ? (lines[sIdx].split(':').length > 1 ? lines[sIdx].split(':')[1].trim() : lines[sIdx+1]) : "";
+        document.getElementById('inTilaaja').value = ordererVal;
 
-        // ÄLYKÄS LASKUTUS-TUNNISTIN
+        // LASKU
         let billVal = "Asiakas maksaa";
         if (lowTxt.includes("fortum")) billVal = "FORTUM";
         else if (lowTxt.includes("kone")) billVal = "KONE";
@@ -121,10 +130,23 @@
         }
         document.getElementById('inLasku').value = billVal;
 
+        // HUOMIO-SIIVOUS (Puhdistetaan pois matkustaja, tilaaja, hinta ja numero)
+        let phoneMatch = txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || "";
         let notes = lines.filter(l => 
-            !l.toLowerCase().match(/lähtö|meno|kyytiin|tilaaja|til:|lasku|ok\?|klo/) &&
-            !l.match(/(\d{1,2})\.(\d{1,2})/) && l.length > 5
-        ).join(' ').replace(new RegExp(cleanName, 'gi'), '').replace(/\d{1,3}\s*[e€]/gi, '').trim();
+            !l.toLowerCase().match(/lähtö|meno|kyytiin|tilaaja|til:|lasku|ok\?|klo|nouto|kohde/) &&
+            !l.match(/(\d{1,2})\.(\d{1,2})/) && 
+            l !== passenger && l !== ordererVal && l !== fromV && l !== toV && l !== billVal
+        ).join(' ');
+
+        // Lopullinen hienopesu huomioille
+        notes = notes.replace(new RegExp(passenger, 'gi'), '')
+                     .replace(new RegExp(ordererVal, 'gi'), '')
+                     .replace(new RegExp(hintaStr + "e|€", 'gi'), '')
+                     .replace(/\d{1,3}\s*[e€]/gi, '')
+                     .replace(/\+?\d[\d\s-]{7,}/g, '')
+                     .replace(/\s\s+/g, ' ')
+                     .trim();
+        
         document.getElementById('inHuomio').value = notes;
     };
 
@@ -153,7 +175,8 @@
                 tr.innerHTML = `
                     <td><b>${r.date}</b><br>${r.time}</td>
                     <td><small>N:</small> ${r.from}<br><small>K:</small> ${r.to}</td>
-                    <td><b>${r.customer}</b><br><small>Tilaaja: ${r.orderer || '-'}</small></td>
+                    <td><b>${r.customer}</b><br><small>${r.phone || ''}</small></td>
+                    <td>${r.orderer || '-'}</td>
                     <td><span class="price-tag">${r.price}€</span><br><small>${r.type}</small></td>
                     <td>${r.billing || 'Asiakas maksaa'}</td>
                     <td><small><b>Huo:</b> ${r.notes || '-'}<br><b style="color:#d00">Poik:</b> ${r.deviation || '-'}</small></td>
@@ -198,10 +221,15 @@
 
     document.getElementById('btnSave').onclick = async () => {
         const txt = document.getElementById('msgInput').value;
+        const hinta = document.getElementById('inHinta').value;
+        let phoneMatch = txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '-';
+        // Varmistetaan ettei hinta ole puhelinnumerossa
+        let cleanPhone = phoneMatch.replace(hinta, '').trim();
+
         const data = {
             date: document.getElementById('inPvm').value,
             time: document.getElementById('inKlo').value,
-            price: document.getElementById('inHinta').value,
+            price: hinta,
             type: document.getElementById('inTyyppi').value,
             from: document.getElementById('inFrom').value,
             to: document.getElementById('inTo').value,
@@ -210,7 +238,7 @@
             billing: document.getElementById('inLasku').value,
             notes: document.getElementById('inHuomio').value,
             deviation: document.getElementById('inPoikkeama').value,
-            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '-') : (txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '-')
+            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '-') : cleanPhone
         };
         if(editId) { await updateDoc(doc(db, "taksitulot", editId), data); editId = null; }
         else { await addDoc(collection(db, "taksitulot"), data); }
