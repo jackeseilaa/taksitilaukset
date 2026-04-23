@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V34.4</title>
+    <title>Kuljetuskirja V34.5</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; }
@@ -33,7 +33,7 @@
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 34.4 (NOTES IMPROVED)</div>
+    <div class="v-tag">VERSIO 34.5 (SMART NOTES)</div>
 
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
@@ -90,44 +90,48 @@
         const txt = document.getElementById('msgInput').value;
         const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
+        // 1. PVM & KLO
         let pvmMatch = txt.match(/(\d{1,2})\.(\d{1,2})/);
         if (pvmMatch) {
             let pvm = pvmMatch[0];
             if (!pvm.includes('2026')) pvm += ".2026";
             document.getElementById('inPvm').value = pvm;
         }
-
         document.getElementById('inKlo').value = txt.match(/(\d{1,2})[.:](\d{2})/)?.[0] || "";
+        
+        // 2. HINTA & TYYPPI
         document.getElementById('inHinta').value = txt.match(/(\d{1,3})\s*[e€]/i)?.[1] || "";
         document.getElementById('inTyyppi').value = txt.toLowerCase().includes('vip') ? 'VIP' : 'Normaali';
         
+        // 3. REITIT
         const fromIdx = lines.findIndex(l => l.toLowerCase().startsWith('lähtö') || l.toLowerCase().startsWith('nouto'));
-        document.getElementById('inFrom').value = (fromIdx !== -1 && lines[fromIdx+1]) ? lines[fromIdx+1] : "";
+        const fromVal = (fromIdx !== -1 && lines[fromIdx+1]) ? lines[fromIdx+1] : "";
+        document.getElementById('inFrom').value = fromVal;
         
         const toIdx = lines.findIndex(l => l.toLowerCase().startsWith('meno') || l.toLowerCase().startsWith('kohde'));
-        document.getElementById('inTo').value = (toIdx !== -1 && lines[toIdx+1]) ? lines[toIdx+1] : "";
+        const toVal = (toIdx !== -1 && lines[toIdx+1]) ? lines[toIdx+1] : "";
+        document.getElementById('inTo').value = toVal;
         
+        // 4. ASIAKAS
         const nIdx = lines.findIndex(l => l.toLowerCase().includes('kyytiin') || l.toLowerCase().includes('tilaaja'));
-        document.getElementById('inNimi').value = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1] : "";
+        const nameVal = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1] : "";
+        document.getElementById('inNimi').value = nameVal;
 
-        // Huomioiden poiminta: Etsitään numeroa seuraavat rivit, jotka eivät ole laskua tai OK
-        const phoneMatch = txt.match(/(\d[\d\s-]{8,15})/);
-        let notes = "";
-        if (phoneMatch) {
-            const phoneIdx = lines.findIndex(l => l.includes(phoneMatch[0]));
-            if (phoneIdx !== -1) {
-                const afterPhone = lines.slice(phoneIdx + 1);
-                notes = afterPhone.filter(l => 
-                    !l.toLowerCase().includes('lasku') && 
-                    !l.toLowerCase().includes('ok?') &&
-                    l.length > 3
-                ).join(' ');
-            }
-        }
-        document.getElementById('inHuomio').value = notes || lines.find(l => l.toLowerCase().includes('odotus')) || "";
-
+        // 5. LASKU
         const bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
-        document.getElementById('inLasku').value = (bIdx !== -1 && lines[bIdx+1]) ? lines[bIdx+1] : "—";
+        const billVal = (bIdx !== -1 && lines[bIdx+1]) ? lines[bIdx+1] : "—";
+        document.getElementById('inLasku').value = billVal;
+
+        // 6. HUOMIOT (Kaikki muu "roska" mikä jää yli)
+        let otherLines = lines.filter(l => 
+            l !== fromVal && l !== toVal && l !== nameVal && l !== billVal &&
+            !l.toLowerCase().includes('lähtö') && !l.toLowerCase().includes('meno') &&
+            !l.toLowerCase().includes('kyytiin') && !l.toLowerCase().includes('lasku') &&
+            !l.toLowerCase().includes('huomenna') && !l.toLowerCase().includes('klo') &&
+            !l.match(/(\d{1,2})\.(\d{1,2})/) && !l.match(/(\d{1,2})[.:](\d{2})/) &&
+            !l.toLowerCase().includes('ok?') && l.length > 2
+        );
+        document.getElementById('inHuomio').value = otherLines.join(' ');
     };
 
     function startListening() {
@@ -184,7 +188,7 @@
         document.getElementById('inNimi').value = item.customer || item.name || "";
         document.getElementById('inHuomio').value = item.notes || "";
         document.getElementById('inLasku').value = item.billing || "";
-        document.getElementById('msgInput').value = "MUOKKAUSTILA: Päivitä tiedot.";
+        document.getElementById('msgInput').value = "MUOKKAUSTILA";
         document.getElementById('btnSave').innerText = "PÄIVITÄ TILAUS";
         document.getElementById('btnSave').classList.add('btn-update');
         window.scrollTo(0,0);
