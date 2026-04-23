@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V33.1</title>
+    <title>Kuljetuskirja V33.2</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -36,7 +36,7 @@
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 33.1 (LASKETTU-SORT)</div>
+    <div class="v-tag">VERSIO 33.2 (NAME RECOVERY)</div>
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
         <button class="btn-login" id="btnLogin">KIRJAUDU SISÄÄN</button>
@@ -103,7 +103,6 @@
             currentLogs = [];
             snapshot.forEach(d => currentLogs.push({id: d.id, ...d.data()}));
 
-            // UUSI LAJITTELU: Luodaan vertailukelpoinen merkkijono YYYY-MM-DD-HH:MM
             currentLogs.sort((a, b) => {
                 const getSortKey = (item) => {
                     const [d, m] = (item.date || "01.01.").split('.');
@@ -119,7 +118,6 @@
             const todayStr = `${now.getDate()}.${now.getMonth()+1}.`;
 
             currentLogs.forEach(r => {
-                // Tunnistetaan tulevat ajot vertaamalla päivämäärää
                 const isFuture = r.date === todayStr || (parseInt(r.date.split('.')[1]) > now.getMonth()+1) || (parseInt(r.date.split('.')[1]) === now.getMonth()+1 && parseInt(r.date.split('.')[0]) >= now.getDate());
                 const rowClass = isFuture ? 'row-future' : 'row-past';
                 
@@ -129,7 +127,7 @@
                 const tr = document.createElement('tr');
                 tr.className = `${rowClass} ${separator}`;
                 tr.innerHTML = `
-                    <td><b>${r.date}${r.year ? r.year : ''}</b><br>${r.time}</td>
+                    <td><b>${r.date}${r.year || ''}</b><br>${r.time}</td>
                     <td><small>N:</small> ${r.from}<br><small>K:</small> ${r.to}</td>
                     <td>${r.customer}<br><small>${r.phone || ''}</small></td>
                     <td><span class="price-tag">${r.price}€</span><br><small>${r.type}</small></td>
@@ -165,26 +163,35 @@
     document.getElementById('btnAdd').onclick = async () => {
         const text = document.getElementById('msgInput').value;
         if(!text) return;
-        const lines = text.split('\n').map(l => l.trim());
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
         let pvm = editId ? document.getElementById('editDate').value : (text.match(/(\d{1,2})\.(\d{1,2})/) ? text.match(/(\d{1,2})\.(\d{1,2})/)[0] + "." : "23.4.");
         let vuosi = editId ? document.getElementById('editYear').value : "2026";
         let klo = editId ? document.getElementById('editTime').value : (text.match(/(\d{1,2})[.:](\d{2})/) ? text.match(/(\d{1,2})[.:](\d{2})/)[0] : "00:00");
         let hinta = editId ? document.getElementById('editPrice').value : (text.match(/(?<!\d)(\d{1,3})\s*[e€]/i) ? text.match(/(?<!\d)(\d{1,3})\s*[e€]/i)[1] : "0");
+        let puh = text.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '—';
+
+        // NIMEN POIMINTA: etsitään riviä joka ei ole osoite tai aika
+        let cust = lines.find(l => l.toLowerCase().includes('kyytiin') || l.toLowerCase().includes('asiakas') || l.toLowerCase().includes('nimi'))?.split(':').pop().trim();
+        if(!cust) {
+            // Jos selitettä ei löydy, kokeillaan poimia rivi joka näyttää nimeltä (ei numeroita, sopiva pituus)
+            cust = lines.find(l => l.length > 3 && !l.includes(':') && !/\d/.test(l) && !l.toLowerCase().includes('ok?')) || '—';
+        }
+        if(puh !== '—') cust = cust.replace(puh, '').trim();
 
         const data = {
             date: pvm,
             year: vuosi,
             time: klo,
-            from: lines.find(l => l.toLowerCase().includes('nouto') || l.toLowerCase().includes('lähtö'))?.split(':').pop().trim() || lines[0],
-            to: lines.find(l => l.toLowerCase().includes('kohde') || l.toLowerCase().includes('meno'))?.split(':').pop().trim() || lines[1],
-            customer: lines.find(l => l.toLowerCase().includes('kyytiin') || l.toLowerCase().includes('nimi'))?.split(':').pop().trim() || '—',
-            phone: text.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '—',
+            from: lines.find(l => l.toLowerCase().includes('nouto') || l.toLowerCase().includes('lähtö'))?.split(':').pop().trim() || lines[0] || '—',
+            to: lines.find(l => l.toLowerCase().includes('kohde') || l.toLowerCase().includes('meno'))?.split(':').pop().trim() || lines[1] || '—',
+            customer: cust,
+            phone: puh,
             price: hinta,
             type: text.toLowerCase().includes('vip') ? 'VIP' : 'Normaali',
-            notes: lines.find(l => ['odotus','huomio','mittari'].some(k => l.toLowerCase().includes(k))) || '—',
+            notes: lines.find(l => ['odotus','huomio','mittari','kupu'].some(k => l.toLowerCase().includes(k))) || '—',
             billing: text.toLowerCase().includes('lasku') ? 'Lasku' : '—',
-            driveTimestamp: Date.now() // Käytetään vain muokkauksen seurantaan
+            driveTimestamp: Date.now()
         };
 
         if(editId) {
