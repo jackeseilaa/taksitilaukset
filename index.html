@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V34.3</title>
+    <title>Kuljetuskirja V34.4</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; }
@@ -33,7 +33,7 @@
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 34.3 (YEAR AUTO-FILL)</div>
+    <div class="v-tag">VERSIO 34.4 (NOTES IMPROVED)</div>
 
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
@@ -45,13 +45,14 @@
         <textarea id="msgInput" placeholder="Liitä WhatsApp-viesti tähän..." oninput="parseMessage()"></textarea>
         
         <div class="manual-fields">
-            <div><label>Pvm (lisää 2026 aut.)</label><input type="text" id="inPvm"></div>
+            <div><label>Pvm</label><input type="text" id="inPvm"></div>
             <div><label>Klo</label><input type="text" id="inKlo"></div>
             <div><label>Hinta (€)</label><input type="text" id="inHinta"></div>
             <div><label>Tyyppi</label><input type="text" id="inTyyppi"></div>
             <div class="full-width"><label>Lähtö (Nouto)</label><input type="text" id="inFrom"></div>
             <div class="full-width"><label>Meno (Määränpää)</label><input type="text" id="inTo"></div>
             <div class="full-width"><label>Asiakas / Tilaaja</label><input type="text" id="inNimi"></div>
+            <div class="full-width"><label>Huomio / Erityistä</label><input type="text" id="inHuomio"></div>
             <div class="full-width"><label>Laskutustieto</label><input type="text" id="inLasku"></div>
         </div>
 
@@ -89,7 +90,6 @@
         const txt = document.getElementById('msgInput').value;
         const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
-        // POIMINTA: Jos löytyy 23.4, muutetaan se muotoon 23.4.2026
         let pvmMatch = txt.match(/(\d{1,2})\.(\d{1,2})/);
         if (pvmMatch) {
             let pvm = pvmMatch[0];
@@ -103,10 +103,29 @@
         
         const fromIdx = lines.findIndex(l => l.toLowerCase().startsWith('lähtö') || l.toLowerCase().startsWith('nouto'));
         document.getElementById('inFrom').value = (fromIdx !== -1 && lines[fromIdx+1]) ? lines[fromIdx+1] : "";
+        
         const toIdx = lines.findIndex(l => l.toLowerCase().startsWith('meno') || l.toLowerCase().startsWith('kohde'));
         document.getElementById('inTo').value = (toIdx !== -1 && lines[toIdx+1]) ? lines[toIdx+1] : "";
+        
         const nIdx = lines.findIndex(l => l.toLowerCase().includes('kyytiin') || l.toLowerCase().includes('tilaaja'));
         document.getElementById('inNimi').value = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1] : "";
+
+        // Huomioiden poiminta: Etsitään numeroa seuraavat rivit, jotka eivät ole laskua tai OK
+        const phoneMatch = txt.match(/(\d[\d\s-]{8,15})/);
+        let notes = "";
+        if (phoneMatch) {
+            const phoneIdx = lines.findIndex(l => l.includes(phoneMatch[0]));
+            if (phoneIdx !== -1) {
+                const afterPhone = lines.slice(phoneIdx + 1);
+                notes = afterPhone.filter(l => 
+                    !l.toLowerCase().includes('lasku') && 
+                    !l.toLowerCase().includes('ok?') &&
+                    l.length > 3
+                ).join(' ');
+            }
+        }
+        document.getElementById('inHuomio').value = notes || lines.find(l => l.toLowerCase().includes('odotus')) || "";
+
         const bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
         document.getElementById('inLasku').value = (bIdx !== -1 && lines[bIdx+1]) ? lines[bIdx+1] : "—";
     };
@@ -119,10 +138,8 @@
             snap.forEach(d => currentLogs.push({id: d.id, ...d.data()}));
             currentLogs.sort((a,b) => {
                 const key = (i) => {
-                    let d = i.date || '01.01.2026';
-                    let parts = d.split('.');
-                    // Varmistetaan järjestys: YYYY-MM-DD
-                    return `${parts[2] || '2026'}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}-${(i.time||'00:00').replace('.',':')}`;
+                    let parts = (i.date || '01.01.2026').split('.');
+                    return `${parts[2] || '2026'}-${(parts[1]||'01').padStart(2,'0')}-${(parts[0]||'01').padStart(2,'0')}-${(i.time||'00:00').replace('.',':')}`;
                 };
                 return key(b).localeCompare(key(a));
             });
@@ -131,10 +148,7 @@
             const now = new Date();
             currentLogs.forEach(r => {
                 const rParts = (r.date||'').split('.');
-                const rDay = parseInt(rParts[0]);
-                const rMonth = parseInt(rParts[1]);
-                const isFuture = (rMonth > (now.getMonth()+1)) || (rMonth === (now.getMonth()+1) && rDay >= now.getDate());
-                
+                const isFuture = (parseInt(rParts[1]) > (now.getMonth()+1)) || (parseInt(rParts[1]) === (now.getMonth()+1) && parseInt(rParts[0]) >= now.getDate());
                 let sep = (lastDate !== "" && r.date !== lastDate) ? "day-separator" : "";
                 lastDate = r.date;
 
@@ -168,8 +182,9 @@
         document.getElementById('inFrom').value = item.from || "";
         document.getElementById('inTo').value = item.to || "";
         document.getElementById('inNimi').value = item.customer || item.name || "";
+        document.getElementById('inHuomio').value = item.notes || "";
         document.getElementById('inLasku').value = item.billing || "";
-        document.getElementById('msgInput').value = "MUOKKAUSTILA: Päivitä tiedot yllä.";
+        document.getElementById('msgInput').value = "MUOKKAUSTILA: Päivitä tiedot.";
         document.getElementById('btnSave').innerText = "PÄIVITÄ TILAUS";
         document.getElementById('btnSave').classList.add('btn-update');
         window.scrollTo(0,0);
@@ -186,8 +201,8 @@
             to: document.getElementById('inTo').value,
             customer: document.getElementById('inNimi').value,
             billing: document.getElementById('inLasku').value,
-            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '—') : (txt.match(/(\d[\d\s-]{8,15})/)?.[0] || '—'),
-            notes: editId ? (currentLogs.find(l => l.id === editId)?.notes || '—') : (txt.split('\n').find(l => l.toLowerCase().includes('odotus')) || '—')
+            notes: document.getElementById('inHuomio').value,
+            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '—') : (txt.match(/(\d[\d\s-]{8,15})/)?.[0] || '—')
         };
 
         if(editId) {
