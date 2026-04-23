@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V34.0</title>
+    <title>Kuljetuskirja V34.1</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; }
@@ -32,7 +32,7 @@
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 34.0 (COLORS & NAMES RESTORED)</div>
+    <div class="v-tag">VERSIO 34.1 (ROUTE FIX)</div>
 
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
@@ -48,6 +48,8 @@
             <div><label>Klo</label><input type="text" id="inKlo"></div>
             <div><label>Hinta (€)</label><input type="text" id="inHinta"></div>
             <div><label>Tyyppi</label><input type="text" id="inTyyppi"></div>
+            <div class="full-width"><label>Lähtö (Nouto)</label><input type="text" id="inFrom"></div>
+            <div class="full-width"><label>Meno (Määränpää)</label><input type="text" id="inTo"></div>
             <div class="full-width"><label>Asiakas / Tilaaja</label><input type="text" id="inNimi"></div>
             <div class="full-width"><label>Laskutustieto</label><input type="text" id="inLasku"></div>
         </div>
@@ -81,17 +83,23 @@
     window.parseMessage = () => {
         const txt = document.getElementById('msgInput').value;
         const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        
         document.getElementById('inPvm').value = txt.match(/(\d{1,2})\.(\d{1,2})/)?.[0] + "." || "";
         document.getElementById('inKlo').value = txt.match(/(\d{1,2})[.:](\d{2})/)?.[0] || "";
         document.getElementById('inHinta').value = txt.match(/(\d{1,3})\s*[e€]/i)?.[1] || "";
         document.getElementById('inTyyppi').value = txt.toLowerCase().includes('vip') ? 'VIP' : 'Normaali';
         
-        // Asiakkaan haku: katsotaan "Kyytiin" tai "tilaaja" riviä
-        let nIdx = lines.findIndex(l => l.toLowerCase().includes('kyytiin') || l.toLowerCase().includes('tilaaja'));
+        // Reittien poiminta (etsitään tekstiä sanan jälkeen)
+        const fromIdx = lines.findIndex(l => l.toLowerCase().startsWith('lähtö') || l.toLowerCase().startsWith('nouto'));
+        document.getElementById('inFrom').value = (fromIdx !== -1 && lines[fromIdx+1]) ? lines[fromIdx+1] : "";
+        
+        const toIdx = lines.findIndex(l => l.toLowerCase().startsWith('meno') || l.toLowerCase().startsWith('kohde'));
+        document.getElementById('inTo').value = (toIdx !== -1 && lines[toIdx+1]) ? lines[toIdx+1] : "";
+
+        const nIdx = lines.findIndex(l => l.toLowerCase().includes('kyytiin') || l.toLowerCase().includes('tilaaja'));
         document.getElementById('inNimi').value = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1] : "";
         
-        // Laskun haku
-        let bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
+        const bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
         document.getElementById('inLasku').value = (bIdx !== -1 && lines[bIdx+1]) ? lines[bIdx+1] : "—";
     };
 
@@ -101,22 +109,17 @@
             tbody.innerHTML = '';
             let data = [];
             snap.forEach(d => data.push({id: d.id, ...d.data()}));
-            
             data.sort((a,b) => {
                 const key = (i) => `${(i.date||'01.01.').split('.').reverse().join('')}-${(i.time||'00:00').replace('.',':')}`;
                 return key(b).localeCompare(key(a));
             });
 
             let lastDate = "";
-            const today = new Date();
-            const todayRef = `${today.getDate()}.${today.getMonth()+1}.`;
-
+            const now = new Date();
             data.forEach(r => {
-                // Värityslogiikka
                 const rDay = parseInt((r.date||'').split('.')[0]);
                 const rMonth = parseInt((r.date||'').split('.')[1]);
-                const isFuture = (rMonth > (today.getMonth()+1)) || (rMonth === (today.getMonth()+1) && rDay >= today.getDate());
-                
+                const isFuture = (rMonth > (now.getMonth()+1)) || (rMonth === (now.getMonth()+1) && rDay >= now.getDate());
                 let sep = (lastDate !== "" && r.date !== lastDate) ? "day-separator" : "";
                 lastDate = r.date;
 
@@ -144,172 +147,10 @@
             time: document.getElementById('inKlo').value,
             price: document.getElementById('inHinta').value,
             type: document.getElementById('inTyyppi').value,
+            from: document.getElementById('inFrom').value,
+            to: document.getElementById('inTo').value,
             customer: document.getElementById('inNimi').value,
             billing: document.getElementById('inLasku').value,
-            from: lines.find(l => l.toLowerCase().includes('lähtö') || l.toLowerCase().includes('nouto') || l.toLowerCase().includes('salmisaaren'))?.replace('Lähtö','').replace(':','').trim() || '—',
-            to: lines.find(l => l.toLowerCase().includes('meno') || l.toLowerCase().includes('kohde') || l.toLowerCase().includes('fortum'))?.replace('Meno','').replace(':','').trim() || '—',
-            phone: txt.match(/(\d[\d\s-]{8,15})/)?.[0] || '—',
-            notes: lines.find(l => l.toLowerCase().includes('odotus')) || '—'
-        };
-        await addDoc(collection(db, "taksitulot"), data);
-        document.getElementById('msgInput').value = '';
-        document.querySelectorAll('.manual-fields input').forEach(i => i.value = '');
-    };
-
-    window.del = (id) => { if(confirm("Poista?")) deleteDoc(doc(db, "taksitulot", id)); };
-</script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="fi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V34.0</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
-    <style>
-        :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 10px; }
-        .v-tag { color: var(--muted); font-size: 10px; text-align: center; margin-bottom: 5px; }
-        h1 { font-family: 'Syne', sans-serif; font-size: 1.2rem; text-align: center; color: var(--accent); margin-bottom: 15px; text-transform: uppercase; }
-        #auth-section { text-align: center; padding: 100px 20px; }
-        #app-content { display: none; }
-        .btn-login { background: white; color: black; padding: 18px 30px; border-radius: 50px; font-weight: bold; border: none; cursor: pointer; }
-        textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 100px; font-size: 0.9rem; border-left: 4px solid var(--accent); }
-        .manual-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; background: #222; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
-        .manual-fields input { background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; font-family: inherit; font-size: 0.85rem; width: 100%; }
-        .full-width { grid-column: span 2; }
-        label { font-size: 0.6rem; color: var(--accent2); text-transform: uppercase; margin-bottom: 2px; display: block; }
-        .btn-add { background: var(--accent); color: black; width: 100%; padding: 18px; border-radius: 8px; font-weight: 800; border: none; margin-bottom: 15px; cursor: pointer; font-size: 1.1rem; }
-        .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
-        table { width: 100%; border-collapse: collapse; font-size: 0.75rem; min-width: 950px; }
-        th { text-align: left; color: var(--accent2); padding: 12px; border-bottom: 1px solid var(--border); background: #222; }
-        td { padding: 12px; border-bottom: 1px solid #222; vertical-align: top; }
-        .day-separator { border-top: 4px solid var(--accent2) !important; }
-        .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
-        .row-past { opacity: 0.5; }
-        .price-tag { font-weight: bold; color: var(--accent); border: 1px solid rgba(200,240,80,0.3); padding: 2px 4px; border-radius: 4px; }
-        .action-btn { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--accent2); }
-    </style>
-</head>
-<body>
-    <div class="v-tag">VERSIO 34.0 (COLORS & NAMES RESTORED)</div>
-
-    <div id="auth-section">
-        <h1>KULJETUSKIRJA</h1>
-        <button class="btn-login" id="btnLogin">KIRJAUDU SISÄÄN</button>
-    </div>
-
-    <div id="app-content">
-        <h1>KULJETUSKIRJA</h1>
-        <textarea id="msgInput" placeholder="Liitä WhatsApp-viesti tähän..." oninput="parseMessage()"></textarea>
-        
-        <div class="manual-fields">
-            <div><label>Pvm</label><input type="text" id="inPvm"></div>
-            <div><label>Klo</label><input type="text" id="inKlo"></div>
-            <div><label>Hinta (€)</label><input type="text" id="inHinta"></div>
-            <div><label>Tyyppi</label><input type="text" id="inTyyppi"></div>
-            <div class="full-width"><label>Asiakas / Tilaaja</label><input type="text" id="inNimi"></div>
-            <div class="full-width"><label>Laskutustieto</label><input type="text" id="inLasku"></div>
-        </div>
-
-        <button class="btn-add" id="btnSave">TALLENNA TILAUS</button>
-
-        <div class="table-wrapper">
-            <table>
-                <thead><tr><th>Aika</th><th>Reitti</th><th>Asiakas</th><th>Hinta</th><th>Lasku</th><th>Huomio</th><th></th></tr></thead>
-                <tbody id="logs"></tbody>
-            </table>
-        </div>
-    </div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-    const firebaseConfig = { apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs", authDomain: "jsailing-f716c.firebaseapp.com", projectId: "jsailing-f716c", storageBucket: "jsailing-f716c.firebasestorage.app", appId: "1:543523103696:web:439a312efa6aec398a8fd5" };
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-
-    onAuthStateChanged(auth, (user) => {
-        if (user) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('app-content').style.display = 'block'; startListening(); }
-    });
-    document.getElementById('btnLogin').onclick = () => signInWithPopup(auth, provider);
-
-    window.parseMessage = () => {
-        const txt = document.getElementById('msgInput').value;
-        const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        document.getElementById('inPvm').value = txt.match(/(\d{1,2})\.(\d{1,2})/)?.[0] + "." || "";
-        document.getElementById('inKlo').value = txt.match(/(\d{1,2})[.:](\d{2})/)?.[0] || "";
-        document.getElementById('inHinta').value = txt.match(/(\d{1,3})\s*[e€]/i)?.[1] || "";
-        document.getElementById('inTyyppi').value = txt.toLowerCase().includes('vip') ? 'VIP' : 'Normaali';
-        
-        // Asiakkaan haku: katsotaan "Kyytiin" tai "tilaaja" riviä
-        let nIdx = lines.findIndex(l => l.toLowerCase().includes('kyytiin') || l.toLowerCase().includes('tilaaja'));
-        document.getElementById('inNimi').value = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1] : "";
-        
-        // Laskun haku
-        let bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
-        document.getElementById('inLasku').value = (bIdx !== -1 && lines[bIdx+1]) ? lines[bIdx+1] : "—";
-    };
-
-    function startListening() {
-        onSnapshot(query(collection(db, "taksitulot")), (snap) => {
-            const tbody = document.getElementById('logs');
-            tbody.innerHTML = '';
-            let data = [];
-            snap.forEach(d => data.push({id: d.id, ...d.data()}));
-            
-            data.sort((a,b) => {
-                const key = (i) => `${(i.date||'01.01.').split('.').reverse().join('')}-${(i.time||'00:00').replace('.',':')}`;
-                return key(b).localeCompare(key(a));
-            });
-
-            let lastDate = "";
-            const today = new Date();
-            const todayRef = `${today.getDate()}.${today.getMonth()+1}.`;
-
-            data.forEach(r => {
-                // Värityslogiikka
-                const rDay = parseInt((r.date||'').split('.')[0]);
-                const rMonth = parseInt((r.date||'').split('.')[1]);
-                const isFuture = (rMonth > (today.getMonth()+1)) || (rMonth === (today.getMonth()+1) && rDay >= today.getDate());
-                
-                let sep = (lastDate !== "" && r.date !== lastDate) ? "day-separator" : "";
-                lastDate = r.date;
-
-                const tr = document.createElement('tr');
-                tr.className = `${isFuture ? 'row-future' : 'row-past'} ${sep}`;
-                tr.innerHTML = `
-                    <td><b>${r.date || ''}</b><br>${r.time || ''}</td>
-                    <td><small>N:</small> ${r.from || '—'}<br><small>K:</small> ${r.to || '—'}</td>
-                    <td>${r.customer || r.name || '—'}<br><small>${r.phone||''}</small></td>
-                    <td><span class="price-tag">${r.price || '0'}€</span><br><small>${r.type || ''}</small></td>
-                    <td>${r.billing || '—'}</td>
-                    <td><small>${r.notes || ''}</small></td>
-                    <td><button class="action-btn" onclick="window.del('${r.id}')">✕</button></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        });
-    }
-
-    document.getElementById('btnSave').onclick = async () => {
-        const txt = document.getElementById('msgInput').value;
-        const lines = txt.split('\n').map(l => l.trim());
-        const data = {
-            date: document.getElementById('inPvm').value,
-            time: document.getElementById('inKlo').value,
-            price: document.getElementById('inHinta').value,
-            type: document.getElementById('inTyyppi').value,
-            customer: document.getElementById('inNimi').value,
-            billing: document.getElementById('inLasku').value,
-            from: lines.find(l => l.toLowerCase().includes('lähtö') || l.toLowerCase().includes('nouto') || l.toLowerCase().includes('salmisaaren'))?.replace('Lähtö','').replace(':','').trim() || '—',
-            to: lines.find(l => l.toLowerCase().includes('meno') || l.toLowerCase().includes('kohde') || l.toLowerCase().includes('fortum'))?.replace('Meno','').replace(':','').trim() || '—',
             phone: txt.match(/(\d[\d\s-]{8,15})/)?.[0] || '—',
             notes: lines.find(l => l.toLowerCase().includes('odotus')) || '—'
         };
