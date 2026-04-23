@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V34.1</title>
+    <title>Kuljetuskirja V34.2</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; }
@@ -20,6 +20,7 @@
         .full-width { grid-column: span 2; }
         label { font-size: 0.6rem; color: var(--accent2); text-transform: uppercase; margin-bottom: 2px; display: block; }
         .btn-add { background: var(--accent); color: black; width: 100%; padding: 18px; border-radius: 8px; font-weight: 800; border: none; margin-bottom: 15px; cursor: pointer; font-size: 1.1rem; }
+        .btn-update { background: var(--edit) !important; color: white !important; }
         .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
         table { width: 100%; border-collapse: collapse; font-size: 0.75rem; min-width: 950px; }
         th { text-align: left; color: var(--accent2); padding: 12px; border-bottom: 1px solid var(--border); background: #222; }
@@ -28,11 +29,11 @@
         .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
         .row-past { opacity: 0.5; }
         .price-tag { font-weight: bold; color: var(--accent); border: 1px solid rgba(200,240,80,0.3); padding: 2px 4px; border-radius: 4px; }
-        .action-btn { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--accent2); }
+        .action-btn { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--accent2); padding: 4px; }
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 34.1 (ROUTE FIX)</div>
+    <div class="v-tag">VERSIO 34.2 (EDIT FIXED)</div>
 
     <div id="auth-section">
         <h1>KULJETUSKIRJA</h1>
@@ -66,7 +67,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = { apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs", authDomain: "jsailing-f716c.firebaseapp.com", projectId: "jsailing-f716c", storageBucket: "jsailing-f716c.firebasestorage.app", appId: "1:543523103696:web:439a312efa6aec398a8fd5" };
@@ -75,30 +76,28 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
+    let currentLogs = [];
+    let editId = null;
+
     onAuthStateChanged(auth, (user) => {
         if (user) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('app-content').style.display = 'block'; startListening(); }
     });
     document.getElementById('btnLogin').onclick = () => signInWithPopup(auth, provider);
 
     window.parseMessage = () => {
+        if (editId) return;
         const txt = document.getElementById('msgInput').value;
         const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        
         document.getElementById('inPvm').value = txt.match(/(\d{1,2})\.(\d{1,2})/)?.[0] + "." || "";
         document.getElementById('inKlo').value = txt.match(/(\d{1,2})[.:](\d{2})/)?.[0] || "";
         document.getElementById('inHinta').value = txt.match(/(\d{1,3})\s*[e€]/i)?.[1] || "";
         document.getElementById('inTyyppi').value = txt.toLowerCase().includes('vip') ? 'VIP' : 'Normaali';
-        
-        // Reittien poiminta (etsitään tekstiä sanan jälkeen)
         const fromIdx = lines.findIndex(l => l.toLowerCase().startsWith('lähtö') || l.toLowerCase().startsWith('nouto'));
         document.getElementById('inFrom').value = (fromIdx !== -1 && lines[fromIdx+1]) ? lines[fromIdx+1] : "";
-        
         const toIdx = lines.findIndex(l => l.toLowerCase().startsWith('meno') || l.toLowerCase().startsWith('kohde'));
         document.getElementById('inTo').value = (toIdx !== -1 && lines[toIdx+1]) ? lines[toIdx+1] : "";
-
         const nIdx = lines.findIndex(l => l.toLowerCase().includes('kyytiin') || l.toLowerCase().includes('tilaaja'));
         document.getElementById('inNimi').value = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1] : "";
-        
         const bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
         document.getElementById('inLasku').value = (bIdx !== -1 && lines[bIdx+1]) ? lines[bIdx+1] : "—";
     };
@@ -107,22 +106,21 @@
         onSnapshot(query(collection(db, "taksitulot")), (snap) => {
             const tbody = document.getElementById('logs');
             tbody.innerHTML = '';
-            let data = [];
-            snap.forEach(d => data.push({id: d.id, ...d.data()}));
-            data.sort((a,b) => {
+            currentLogs = [];
+            snap.forEach(d => currentLogs.push({id: d.id, ...d.data()}));
+            currentLogs.sort((a,b) => {
                 const key = (i) => `${(i.date||'01.01.').split('.').reverse().join('')}-${(i.time||'00:00').replace('.',':')}`;
                 return key(b).localeCompare(key(a));
             });
 
             let lastDate = "";
             const now = new Date();
-            data.forEach(r => {
+            currentLogs.forEach(r => {
                 const rDay = parseInt((r.date||'').split('.')[0]);
                 const rMonth = parseInt((r.date||'').split('.')[1]);
                 const isFuture = (rMonth > (now.getMonth()+1)) || (rMonth === (now.getMonth()+1) && rDay >= now.getDate());
                 let sep = (lastDate !== "" && r.date !== lastDate) ? "day-separator" : "";
                 lastDate = r.date;
-
                 const tr = document.createElement('tr');
                 tr.className = `${isFuture ? 'row-future' : 'row-past'} ${sep}`;
                 tr.innerHTML = `
@@ -132,16 +130,36 @@
                     <td><span class="price-tag">${r.price || '0'}€</span><br><small>${r.type || ''}</small></td>
                     <td>${r.billing || '—'}</td>
                     <td><small>${r.notes || ''}</small></td>
-                    <td><button class="action-btn" onclick="window.del('${r.id}')">✕</button></td>
+                    <td>
+                        <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
+                        <button class="action-btn" onclick="window.del('${r.id}')">✕</button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
         });
     }
 
+    window.prepareEdit = (id) => {
+        const item = currentLogs.find(l => l.id === id);
+        if(!item) return;
+        editId = id;
+        document.getElementById('inPvm').value = item.date || "";
+        document.getElementById('inKlo').value = item.time || "";
+        document.getElementById('inHinta').value = item.price || "";
+        document.getElementById('inTyyppi').value = item.type || "";
+        document.getElementById('inFrom').value = item.from || "";
+        document.getElementById('inTo').value = item.to || "";
+        document.getElementById('inNimi').value = item.customer || item.name || "";
+        document.getElementById('inLasku').value = item.billing || "";
+        document.getElementById('msgInput').value = "MUOKKAUSTILA: Päivitä tiedot yllä oleviin kenttiin.";
+        document.getElementById('btnSave').innerText = "PÄIVITÄ TILAUS";
+        document.getElementById('btnSave').classList.add('btn-update');
+        window.scrollTo(0,0);
+    };
+
     document.getElementById('btnSave').onclick = async () => {
         const txt = document.getElementById('msgInput').value;
-        const lines = txt.split('\n').map(l => l.trim());
         const data = {
             date: document.getElementById('inPvm').value,
             time: document.getElementById('inKlo').value,
@@ -151,10 +169,18 @@
             to: document.getElementById('inTo').value,
             customer: document.getElementById('inNimi').value,
             billing: document.getElementById('inLasku').value,
-            phone: txt.match(/(\d[\d\s-]{8,15})/)?.[0] || '—',
-            notes: lines.find(l => l.toLowerCase().includes('odotus')) || '—'
+            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '—') : (txt.match(/(\d[\d\s-]{8,15})/)?.[0] || '—'),
+            notes: editId ? (currentLogs.find(l => l.id === editId)?.notes || '—') : (txt.split('\n').find(l => l.toLowerCase().includes('odotus')) || '—')
         };
-        await addDoc(collection(db, "taksitulot"), data);
+
+        if(editId) {
+            await updateDoc(doc(db, "taksitulot", editId), data);
+            editId = null;
+            document.getElementById('btnSave').innerText = "TALLENNA TILAUS";
+            document.getElementById('btnSave').classList.remove('btn-update');
+        } else {
+            await addDoc(collection(db, "taksitulot"), data);
+        }
         document.getElementById('msgInput').value = '';
         document.querySelectorAll('.manual-fields input').forEach(i => i.value = '');
     };
