@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V35.1</title>
+    <title>Kuljetuskirja V35.2</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; --price-text: #0044ff; }
@@ -27,7 +27,7 @@
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 35.1 (BILLING SEARCH FIX)</div>
+    <div class="v-tag">VERSIO 35.2 (DATA CLEANUP)</div>
 
     <div id="app-content">
         <h1>KULJETUSKIRJA</h1>
@@ -76,14 +76,14 @@
         const txt = document.getElementById('msgInput').value;
         const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
-        // PVM & KLO
+        // PVM, KLO & HINTA
         let pvmM = txt.match(/(\d{1,2})\.(\d{1,2})/);
         if (pvmM) document.getElementById('inPvm').value = pvmM[0].includes('2026') ? pvmM[0] : pvmM[0] + ".2026";
         document.getElementById('inKlo').value = txt.match(/(\d{1,2})[.:](\d{2})/)?.[0] || "";
         
-        // HINTA
         const hintaMatch = txt.match(/(\d{1,3})\s*[e€]/i);
-        document.getElementById('inHinta').value = hintaMatch ? hintaMatch[1] : "";
+        const hintaVal = hintaMatch ? hintaMatch[1] : "";
+        document.getElementById('inHinta').value = hintaVal;
         document.getElementById('inTyyppi').value = txt.toLowerCase().includes('vip') ? 'VIP' : 'Normaali';
         
         // REITIT
@@ -94,13 +94,13 @@
         const toV = (tIdx !== -1) ? lines[tIdx+1] : "";
         document.getElementById('inTo').value = toV;
         
-        // NIMI
+        // NIMI & NUMERO (Puhdistus hinta-osasta)
         const nIdx = lines.findIndex(l => l.toLowerCase().match(/kyytiin|tilaaja/));
-        let rawName = (nIdx !== -1) ? lines[nIdx+1] : "";
-        let cleanName = rawName.replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim();
+        let rawNameLine = (nIdx !== -1) ? lines[nIdx+1] : "";
+        let cleanName = rawNameLine.replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim();
         document.getElementById('inNimi').value = cleanName;
 
-        // LASKU - Etsitään sanaa "lasku"
+        // LASKU
         const bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
         let billVal = "—";
         if (bIdx !== -1 && lines[bIdx+1] && !lines[bIdx+1].toLowerCase().includes('ok?')) {
@@ -108,8 +108,8 @@
         }
         document.getElementById('inLasku').value = billVal;
 
-        // HUOMIO
-        let ignoredLines = [fromV, toV, rawName, billVal];
+        // HUOMIO (Tiukka suodatus: poista numero, hinta ja nimi)
+        let ignoredLines = [fromV, toV, rawNameLine, billVal];
         let notes = lines.filter(l => 
             !ignoredLines.includes(l) && 
             !l.toLowerCase().match(/lähtö|meno|kyytiin|lasku|huomenna|klo|ok\?/) &&
@@ -117,10 +117,15 @@
             l.length > 3
         ).join(' ');
 
-        // Puhdistetaan huomioista nimi ja vip-maininnat
-        if (cleanName.length > 2) {
-            notes = notes.replace(new RegExp(cleanName, 'gi'), '').replace(/vip/gi, '').replace(/\//g, '').replace(/\s\s+/g, ' ').trim();
-        }
+        // Siivotaan loput turhat tiedot pois
+        notes = notes.replace(new RegExp(cleanName, 'gi'), '') // Poista nimi
+                     .replace(/\d{1,3}\s*[e€]/gi, '')         // Poista hinta esim "70e"
+                     .replace(/\+?\d[\d\s-]{7,}/g, '')        // Poista puhelinnumerot
+                     .replace(/vip/gi, '')                    // Poista "vip"
+                     .replace(/\//g, '')                      // Poista vinoviivat
+                     .replace(/\s\s+/g, ' ')                  // Poista ylimääräiset välit
+                     .trim();
+
         document.getElementById('inHuomio').value = notes;
     };
 
@@ -139,10 +144,13 @@
             currentLogs.forEach(r => {
                 const tr = document.createElement('tr');
                 tr.className = 'row-future';
+                // Puhdistetaan hinta pois puhelinnumeron perästä listassa
+                let displayPhone = (r.phone || '').replace(r.price, '').trim();
+                
                 tr.innerHTML = `
                     <td><b>${r.date || ''}</b><br>${r.time || ''}</td>
                     <td><small>N:</small> ${r.from || '—'}<br><small>K:</small> ${r.to || '—'}</td>
-                    <td>${r.customer || '—'}<br><small>${r.phone||''}</small></td>
+                    <td>${r.customer || '—'}<br><small>${displayPhone}</small></td>
                     <td><span class="price-tag">${r.price || '0'}€</span><br><small>${r.type || ''}</small></td>
                     <td>${r.billing || '—'}</td>
                     <td><small>${r.notes || ''}</small></td>
@@ -174,17 +182,22 @@
 
     document.getElementById('btnSave').onclick = async () => {
         const txt = document.getElementById('msgInput').value;
+        const hinta = document.getElementById('inHinta').value;
+        let rawPhone = txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '—';
+        // Varmistetaan että puhelinnumeroon ei tallenneta hintaa
+        let cleanPhone = rawPhone.replace(hinta, '').trim();
+
         const data = {
             date: document.getElementById('inPvm').value,
             time: document.getElementById('inKlo').value,
-            price: document.getElementById('inHinta').value,
+            price: hinta,
             type: document.getElementById('inTyyppi').value,
             from: document.getElementById('inFrom').value,
             to: document.getElementById('inTo').value,
             customer: document.getElementById('inNimi').value,
             billing: document.getElementById('inLasku').value,
             notes: document.getElementById('inHuomio').value,
-            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '—') : (txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '—')
+            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '—') : cleanPhone
         };
         if(editId) { await updateDoc(doc(db, "taksitulot", editId), data); editId = null; }
         else { await addDoc(collection(db, "taksitulot"), data); }
