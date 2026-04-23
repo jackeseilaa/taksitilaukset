@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V34.6</title>
+    <title>Kuljetuskirja V34.7</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;800&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #0f0f0f; --surface: #1a1a1a; --border: #2e2e2e; --accent: #c8f050; --accent2: #50c8f0; --text: #f0f0f0; --muted: #666; --edit: #f0a050; --future-bg: #d4f8a0; --future-text: #000000; }
@@ -11,9 +11,7 @@
         body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 10px; }
         .v-tag { color: var(--muted); font-size: 10px; text-align: center; margin-bottom: 5px; }
         h1 { font-family: 'Syne', sans-serif; font-size: 1.2rem; text-align: center; color: var(--accent); margin-bottom: 15px; text-transform: uppercase; }
-        #auth-section { text-align: center; padding: 100px 20px; }
-        #app-content { display: none; }
-        .btn-login { background: white; color: black; padding: 18px 30px; border-radius: 50px; font-weight: bold; border: none; cursor: pointer; }
+        #app-content { display: block; }
         textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 100px; font-size: 0.9rem; border-left: 4px solid var(--accent); }
         .manual-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; background: #222; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
         .manual-fields input { background: #000; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; font-family: inherit; font-size: 0.85rem; width: 100%; }
@@ -33,12 +31,7 @@
     </style>
 </head>
 <body>
-    <div class="v-tag">VERSIO 34.6 (FIXED PARSING)</div>
-
-    <div id="auth-section">
-        <h1>KULJETUSKIRJA</h1>
-        <button class="btn-login" id="btnLogin">KIRJAUDU SISÄÄN</button>
-    </div>
+    <div class="v-tag">VERSIO 34.7 (CLEAN PARSE)</div>
 
     <div id="app-content">
         <h1>KULJETUSKIRJA</h1>
@@ -80,85 +73,77 @@
     let currentLogs = [];
     let editId = null;
 
-    onAuthStateChanged(auth, (user) => {
-        if (user) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('app-content').style.display = 'block'; startListening(); }
-    });
-    document.getElementById('btnLogin').onclick = () => signInWithPopup(auth, provider);
+    onAuthStateChanged(auth, (u) => { if(u) startListening(); else signInWithPopup(auth, provider); });
 
     window.parseMessage = () => {
         if (editId) return;
         const txt = document.getElementById('msgInput').value;
         const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
-        let pvmMatch = txt.match(/(\d{1,2})\.(\d{1,2})/);
-        if (pvmMatch) {
-            let pvm = pvmMatch[0];
-            if (!pvm.includes('2026')) pvm += ".2026";
-            document.getElementById('inPvm').value = pvm;
+        // PVM & KLO
+        let pvmM = txt.match(/(\d{1,2})\.(\d{1,2})/);
+        if (pvmM) {
+            let p = pvmM[0];
+            document.getElementById('inPvm').value = p.includes('2026') ? p : p + ".2026";
         }
         document.getElementById('inKlo').value = txt.match(/(\d{1,2})[.:](\d{2})/)?.[0] || "";
         document.getElementById('inHinta').value = txt.match(/(\d{1,3})\s*[e€]/i)?.[1] || "";
         document.getElementById('inTyyppi').value = txt.toLowerCase().includes('vip') ? 'VIP' : 'Normaali';
         
-        const fromIdx = lines.findIndex(l => l.toLowerCase().startsWith('lähtö') || l.toLowerCase().startsWith('nouto'));
-        const fromVal = (fromIdx !== -1 && lines[fromIdx+1]) ? lines[fromIdx+1] : "";
-        document.getElementById('inFrom').value = fromVal;
+        // REITIT
+        const fIdx = lines.findIndex(l => l.toLowerCase().startsWith('lähtö') || l.toLowerCase().startsWith('nouto'));
+        const fV = (fIdx !== -1 && lines[fIdx+1]) ? lines[fIdx+1] : "";
+        document.getElementById('inFrom').value = fV;
         
-        const toIdx = lines.findIndex(l => l.toLowerCase().startsWith('meno') || l.toLowerCase().startsWith('kohde'));
-        const toVal = (toIdx !== -1 && lines[toIdx+1]) ? lines[toIdx+1] : "";
-        document.getElementById('inTo').value = toVal;
+        const tIdx = lines.findIndex(l => l.toLowerCase().startsWith('meno') || l.toLowerCase().startsWith('kohde'));
+        const tV = (tIdx !== -1 && lines[tIdx+1]) ? lines[tIdx+1] : "";
+        document.getElementById('inTo').value = tV;
         
+        // NIMI (Siivous: pois / ja puhelin)
         const nIdx = lines.findIndex(l => l.toLowerCase().includes('kyytiin') || l.toLowerCase().includes('tilaaja'));
-        let nameVal = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1] : "";
-        // Poistetaan puhelinnumero nimestä jos se on samalla rivillä
-        nameVal = nameVal.replace(/\+?\d[\d\s-]{7,}/, '').trim();
-        document.getElementById('inNimi').value = nameVal;
+        let nV = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1] : "";
+        nV = nV.replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim();
+        document.getElementById('inNimi').value = nV;
 
+        // LASKU
         const bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
-        let billVal = (bIdx !== -1 && lines[bIdx+1]) ? lines[bIdx+1] : "—";
-        if (billVal.toLowerCase().includes('ok?')) billVal = "—";
-        document.getElementById('inLasku').value = billVal;
+        let bV = (bIdx !== -1 && lines[bIdx+1]) ? lines[bIdx+1] : "—";
+        if (bV.toLowerCase().includes('ok?')) bV = "—";
+        document.getElementById('inLasku').value = bV;
 
-        const phoneMatch = txt.match(/(\+?\d[\d\s-]{8,15})/);
-        const hintaMatch = txt.match(/(\d{1,3})\s*[e€]/i);
-
-        let otherLines = lines.filter(l => 
-            l !== fromVal && l !== toVal && l !== nameVal && l !== billVal &&
-            !l.toLowerCase().includes('lähtö') && !l.toLowerCase().includes('meno') &&
-            !l.toLowerCase().includes('kyytiin') && !l.toLowerCase().includes('lasku') &&
-            !l.toLowerCase().includes('huomenna') && !l.toLowerCase().includes('klo') &&
+        // HUOMIOT (Tiukka suodatin: ei numeroita tai hintoja)
+        let oL = lines.filter(l => 
+            l !== fV && l !== tV && l !== nV && l !== bV &&
+            !l.toLowerCase().match(/lähtö|meno|kyytiin|lasku|huomenna|klo|ok\?/) &&
             !l.match(/(\d{1,2})\.(\d{1,2})/) && !l.match(/(\d{1,2})[.:](\d{2})/) &&
-            !l.toLowerCase().includes('ok?') && l.length > 2 &&
-            (!phoneMatch || !l.includes(phoneMatch[0])) &&
-            (!hintaMatch || !l.includes(hintaMatch[0]))
+            !l.match(/\+?\d[\d\s-]{7,}/) && !l.match(/(\d{1,3})\s*[e€]/i) &&
+            l.length > 2
         );
-        document.getElementById('inHuomio').value = otherLines.join(' ');
+        document.getElementById('inHuomio').value = oL.join(' ');
     };
 
     function startListening() {
         onSnapshot(query(collection(db, "taksitulot")), (snap) => {
             const tbody = document.getElementById('logs');
             tbody.innerHTML = '';
-            currentLogs = [];
-            snap.forEach(d => currentLogs.push({id: d.id, ...d.data()}));
+            currentLogs = snap.docs.map(d => ({id: d.id, ...d.data()}));
             currentLogs.sort((a,b) => {
-                const key = (i) => {
-                    let parts = (i.date || '01.01.2026').split('.');
-                    return `${parts[2] || '2026'}-${(parts[1]||'01').padStart(2,'0')}-${(parts[0]||'01').padStart(2,'0')}-${(i.time||'00:00').replace('.',':')}`;
+                const k = (i) => {
+                    let p = (i.date || '01.01.2026').split('.');
+                    return `${p[2]||'2026'}-${(p[1]||'01').padStart(2,'0')}-${(p[0]||'01').padStart(2,'0')}-${(i.time||'00:00').replace('.',':')}`;
                 };
-                return key(b).localeCompare(key(a));
+                return k(b).localeCompare(k(a));
             });
 
-            let lastDate = "";
+            let lastD = "";
             const now = new Date();
             currentLogs.forEach(r => {
-                const rParts = (r.date||'').split('.');
-                const isFuture = (parseInt(rParts[1]) > (now.getMonth()+1)) || (parseInt(rParts[1]) === (now.getMonth()+1) && parseInt(rParts[0]) >= now.getDate());
-                let sep = (lastDate !== "" && r.date !== lastDate) ? "day-separator" : "";
-                lastDate = r.date;
-
+                const rP = (r.date||'').split('.');
+                const isF = (parseInt(rP[1]) > (now.getMonth()+1)) || (parseInt(rP[1]) === (now.getMonth()+1) && parseInt(rP[0]) >= now.getDate());
+                let sep = (lastD !== "" && r.date !== lastD) ? "day-separator" : "";
+                lastD = r.date;
                 const tr = document.createElement('tr');
-                tr.className = `${isFuture ? 'row-future' : 'row-past'} ${sep}`;
+                tr.className = `${isF ? 'row-future' : 'row-past'} ${sep}`;
                 tr.innerHTML = `
                     <td><b>${r.date || ''}</b><br>${r.time || ''}</td>
                     <td><small>N:</small> ${r.from || '—'}<br><small>K:</small> ${r.to || '—'}</td>
@@ -189,7 +174,6 @@
         document.getElementById('inNimi').value = item.customer || item.name || "";
         document.getElementById('inHuomio').value = item.notes || "";
         document.getElementById('inLasku').value = item.billing || "";
-        document.getElementById('msgInput').value = "MUOKKAUSTILA";
         document.getElementById('btnSave').innerText = "PÄIVITÄ TILAUS";
         document.getElementById('btnSave').classList.add('btn-update');
         window.scrollTo(0,0);
@@ -209,7 +193,6 @@
             notes: document.getElementById('inHuomio').value,
             phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '—') : (txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '—')
         };
-
         if(editId) {
             await updateDoc(doc(db, "taksitulot", editId), data);
             editId = null;
