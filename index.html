@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V37.0</title>
+    <title>Kuljetuskirja V37.1</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -92,7 +92,7 @@
 <body>
 
 ```
-<div class="v-tag">VERSIO 37.0 (PHONE DISPLAY, TIME VALIDATION, EDIT FEEDBACK)</div>
+<div class="v-tag">VERSIO 37.1 (IMPROVED PARSING: HUOMENNA, OK?, POIKKEAMA)</div>
 <h1>KULJETUSKIRJA</h1>
 
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
@@ -167,7 +167,6 @@
                 let hours = parseInt(clean.substring(0, 2));
                 let minutes = parseInt(clean.substring(2, 4));
                 
-                // Validaatio: tunti 0-23, minuutit 0-59
                 if (isNaN(hours) || isNaN(minutes)) return "00:00";
                 hours = Math.max(0, Math.min(23, hours));
                 minutes = Math.max(0, Math.min(59, minutes));
@@ -188,21 +187,44 @@
         return dateStr;
     };
 
+    // Huomisen päivämäärän laskenta
+    const getTomorrowDate = () => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const day = String(tomorrow.getDate()).padStart(2, '0');
+        const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+        const year = tomorrow.getFullYear();
+        return `${day}.${month}.${year}`;
+    };
+
     window.parseMessage = () => {
         if (editId) return;
         const txt = document.getElementById('msgInput').value;
         const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
-        let pvmM = txt.match(/(\d{1,2})\.(\d{1,2})/);
-        if (pvmM) document.getElementById('inPvm').value = formatDate(pvmM[0]);
+        // Parannettu päivämäärä-parsinta: "Huomenna" + päivä/kk
+        let pvmValue = "";
+        if (txt.toLowerCase().includes('huomenna')) {
+            pvmValue = getTomorrowDate();
+        } else {
+            let pvmM = txt.match(/(\d{1,2})\.(\d{1,2})/);
+            if (pvmM) pvmValue = formatDate(pvmM[0]);
+        }
+        document.getElementById('inPvm').value = pvmValue;
         
         // Parempi kellonajan etsintä ja validaatio
         let kloMatch = txt.match(/(\d{1,2})[.:](\d{2})/) || txt.match(/klo\s*(\d{4})/i) || txt.match(/klo\s*(\d{1,2})/i);
         document.getElementById('inKlo').value = kloMatch ? formatTime(kloMatch[0].replace(/klo/i, '').trim()) : "";
         
+        // Hinta + tyyppi yhdessä: "70e vip" → hinta 70, tyyppi VIP
         const hintaMatch = txt.match(/(\d{1,3})\s*[e€]/i);
         document.getElementById('inHinta').value = hintaMatch ? hintaMatch[1] : "";
-        document.getElementById('inTyyppi').value = txt.toLowerCase().includes('vip') ? 'VIP' : 'Normaali';
+        
+        let typeVal = "Normaali";
+        if (txt.toLowerCase().includes('vip')) {
+            typeVal = 'VIP';
+        }
+        document.getElementById('inTyyppi').value = typeVal;
         
         const fIdx = lines.findIndex(l => l.toLowerCase().match(/lähtö|nouto/));
         document.getElementById('inFrom').value = (fIdx !== -1 && lines[fIdx+1]) ? lines[fIdx+1] : "";
@@ -222,22 +244,50 @@
         }
         document.getElementById('inTilaaja').value = ordererVal;
 
+        // Parannettu LASKU-detektio: ignoroi "Ok?" rivit
         let billVal = "Asiakas maksaa";
-        if (txt.toLowerCase().includes("fortum")) billVal = "FORTUM";
-        else if (txt.toLowerCase().includes("kone")) billVal = "KONE";
-        else {
+        if (txt.toLowerCase().includes("fortum")) {
+            billVal = "FORTUM";
+        } else if (txt.toLowerCase().includes("kone")) {
+            billVal = "KONE";
+        } else {
             const bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
-            if (bIdx !== -1 && lines[bIdx+1] && !lines[bIdx+1].toLowerCase().includes('ok?')) billVal = lines[bIdx+1];
+            if (bIdx !== -1) {
+                // Etsi seuraava rivi joka ei ole tyhjä, "Ok?" tai muu ignoroitava
+                for (let i = bIdx + 1; i < lines.length; i++) {
+                    if (lines[i] && !lines[i].toLowerCase().match(/^ok\?|^ok/)) {
+                        billVal = lines[i];
+                        break;
+                    }
+                }
+            }
         }
         document.getElementById('inLasku').value = billVal;
 
         let phoneMatch = txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '';
         document.getElementById('inPuhelin').value = phoneMatch;
 
+        // Parannettu poikkeama-tunnistus ja huomio-suodatus
+        let deviationVal = "";
+        if (txt.toLowerCase().match(/odotus|extra|lisä|ylimenev|kulutus/)) {
+            // Etsitään poikkeamaan liittyvät numerot ja tekstit
+            let devMatch = txt.match(/(odotus|extra|lisä|ylimenev|kulutus)[^.\n]*/gi);
+            if (devMatch) {
+                deviationVal = devMatch.join('; ').substring(0, 100);
+            } else {
+                deviationVal = "Odotus/lisäaika";
+            }
+        }
+        document.getElementById('inPoikkeama').value = deviationVal;
+
+        // Huomiot: suodata pois "Ok?", "Lasku", "huomenna", pvm, kellonaika jne
         let notes = lines.filter(l => 
-            !l.toLowerCase().match(/lähtö|meno|kyytiin|tilaaja|til:|lasku|ok\?|klo|nouto|kohde|huomenna/) &&
-            !l.match(/(\d{1,2})\.(\d{1,2})/) && 
-            l !== passenger && l !== ordererVal
+            !l.toLowerCase().match(/lähtö|meno|kyytiin|tilaaja|til:|lasku|klo|nouto|kohde|huomenna/) &&
+            !l.match(/(\d{1,2})\.(\d{1,2})/) &&
+            !l.toLowerCase().match(/^ok\?|^ok/) &&
+            !l.match(/^\+?\d[\d\s-]{8,}/) &&
+            l !== passenger && l !== ordererVal &&
+            !l.toLowerCase().match(/odotus|extra|lisä|ylimenev|kulutus/)
         ).join(' ').replace(/[\/]/g, '').replace(/\s\s+/g, ' ').trim();
         
         document.getElementById('inHuomio').value = notes;
@@ -346,395 +396,6 @@
         const hinta = document.getElementById('inHinta').value;
         const rawTime = document.getElementById('inKlo').value;
         
-        // Jos ei editoinnissa, yritä parsita puhelinnumero viestistä
-        let phoneVal = document.getElementById('inPuhelin').value;
-        if (!editId && !phoneVal) {
-            let phoneMatch = txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '';
-            phoneVal = phoneMatch;
-        }
-
-        const data = {
-            date: document.getElementById('inPvm').value,
-            time: formatTime(rawTime),
-            price: hinta,
-            type: document.getElementById('inTyyppi').value,
-            from: document.getElementById('inFrom').value,
-            to: document.getElementById('inTo').value,
-            customer: document.getElementById('inNimi').value,
-            orderer: document.getElementById('inTilaaja').value,
-            billing: document.getElementById('inLasku').value,
-            notes: document.getElementById('inHuomio').value,
-            deviation: document.getElementById('inPoikkeama').value,
-            phone: phoneVal
-        };
-        
-        if(editId) { 
-            await updateDoc(doc(db, "taksitulot", editId), data);
-            window.cancelEdit();
-        }
-        else { 
-            await addDoc(collection(db, "taksitulot"), data); 
-        }
-        
-        document.getElementById('msgInput').value = '';
-        document.querySelectorAll('.manual-fields input').forEach(i => i.value = '');
-    };
-
-    document.getElementById('btnCancel').onclick = window.cancelEdit;
-
-    window.del = (id) => { if(confirm("Poista tilaus pysyvästi?")) deleteDoc(doc(db, "taksitulot", id)); };
-</script>
-
-</body>
-</html><!DOCTYPE html>
-
-<html lang="fi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V37.0</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
-    <style>
-        :root { 
-            --bg: #000000; 
-            --surface: #111111; 
-            --border: #333333; 
-            --accent: #c8f050; 
-            --accent2: #50c8f0; 
-            --text: #ffffff; 
-            --muted: #aaaaaa; 
-            --future-bg: #d4f8a0; 
-            --future-text: #000000; 
-            --price-bg: #ffff00;
-            --price-text: #000000;
-            --edit-mode: #1a3a1a;
-            --edit-accent: #80ff80;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 10px; line-height: 1.4; }
-        .v-tag { color: var(--muted); font-size: 11px; text-align: center; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; }
-        h1 { font-family: 'Syne', sans-serif; font-size: 1.2rem; text-align: center; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
-
-```
-    .edit-mode-indicator {
-        display: none;
-        text-align: center;
-        background: var(--edit-mode);
-        border: 2px solid var(--edit-accent);
-        color: var(--edit-accent);
-        padding: 8px;
-        border-radius: 4px;
-        margin-bottom: 10px;
-        font-weight: bold;
-        text-transform: uppercase;
-        font-size: 0.9rem;
-        animation: pulse-edit 1.5s infinite;
-    }
-
-    @keyframes pulse-edit {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.6; }
-    }
-
-    .edit-mode-indicator.active {
-        display: block;
-    }
-
-    textarea { width: 100%; background: var(--surface); border: 2px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 100px; font-size: 1rem; border-left: 6px solid var(--accent); outline: none; }
-    
-    .manual-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; background: #1a1a1a; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
-    .manual-fields input { background: #000; border: 1px solid #555; color: #fff; padding: 12px; border-radius: 4px; font-family: inherit; font-size: 0.9rem; width: 100%; }
-    .manual-fields input:focus { border-color: var(--accent); box-shadow: 0 0 8px rgba(200, 240, 80, 0.3); }
-    .full-width { grid-column: span 2; }
-    label { font-size: 0.7rem; color: var(--accent2); text-transform: uppercase; margin-bottom: 3px; display: block; font-weight: bold; }
-    
-    .btn-row { display: flex; gap: 8px; margin-bottom: 15px; }
-    .btn-add { background: var(--accent); color: black; flex: 2; padding: 20px; border-radius: 8px; font-weight: 900; border: none; cursor: pointer; font-size: 1.1rem; text-transform: uppercase; transition: all 0.2s ease; }
-    .btn-add:hover { transform: translateY(-2px); box-shadow: 0 8px 0px #444; }
-    .btn-add.edit-mode { background: var(--edit-accent); }
-    .btn-csv { background: #333; color: white; flex: 1; border-radius: 8px; border: 2px solid #444; cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: all 0.2s ease; }
-    .btn-csv:hover { border-color: var(--accent2); color: var(--accent2); }
-    .btn-cancel { background: #4a3333; color: #ff8080; flex: 1; border-radius: 8px; border: 2px solid #6a4444; cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: all 0.2s ease; display: none; }
-    .btn-cancel.show { display: block; }
-    .btn-cancel:hover { border-color: #ff8080; }
-    
-    .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 1250px; }
-    th { text-align: left; color: #ffffff; padding: 15px 10px; border-bottom: 2px solid var(--accent); background: #000; text-transform: uppercase; font-weight: 900; }
-    td { padding: 12px 10px; border-bottom: 1px solid #333; vertical-align: top; }
-    
-    .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
-    .row-past { background-color: #111111 !important; color: #ffffff !important; }
-    
-    .price-tag { font-weight: 900; color: var(--price-text); background: var(--price-bg); padding: 4px 8px; border-radius: 4px; display: inline-block; font-size: 1rem; box-shadow: 2px 2px 0px #000; }
-    .time-tag { font-size: 1.1rem; color: var(--accent2); font-weight: 700; }
-    .action-btn { background: #222; border: 1px solid #444; font-size: 1.2rem; cursor: pointer; color: var(--accent2); padding: 8px; border-radius: 4px; margin-right: 5px; transition: all 0.2s ease; }
-    .action-btn:hover { background: #333; border-color: var(--accent2); transform: scale(1.1); }
-
-    .deviation-tag { color: #ff6666; font-weight: bold; }
-    .note-tag { color: var(--accent2); }
-</style>
-```
-
-</head>
-<body>
-
-```
-<div class="v-tag">VERSIO 37.0 (PHONE DISPLAY, TIME VALIDATION, EDIT FEEDBACK)</div>
-<h1>KULJETUSKIRJA</h1>
-
-<div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
-
-<textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
-
-<div class="manual-fields">
-    <div><label>Pvm</label><input type="text" id="inPvm"></div>
-    <div><label>Klo (esim 12:30)</label><input type="text" id="inKlo"></div>
-    <div><label>Hinta (€)</label><input type="text" id="inHinta" style="background:#ffff00; color:#000; font-weight:bold;"></div>
-    <div><label>Tyyppi</label><input type="text" id="inTyyppi"></div>
-    <div class="full-width"><label>Lähtö</label><input type="text" id="inFrom"></div>
-    <div class="full-width"><label>Meno</label><input type="text" id="inTo"></div>
-    <div><label>Matkustaja</label><input type="text" id="inNimi"></div>
-    <div><label>Puhelin</label><input type="text" id="inPuhelin" placeholder="Näytetään editoinnissa"></div>
-    <div><label>Tilaaja</label><input type="text" id="inTilaaja"></div>
-    <div class="full-width"><label>Lasku / Maksaja</label><input type="text" id="inLasku" style="background:#000; color:#c8f050; border: 1px solid #c8f050;"></div>
-    <div class="full-width"><label>Huomio</label><input type="text" id="inHuomio"></div>
-    <div class="full-width"><label style="color:#f0a050">Ajon aikaiset poikkeamat</label><input type="text" id="inPoikkeama"></div>
-</div>
-
-<div class="btn-row">
-    <button class="btn-add" id="btnSave">TALLENNA TILAUS</button>
-    <button class="btn-csv" onclick="exportToCSV()">LATAA CSV</button>
-    <button class="btn-cancel" id="btnCancel">PERUUTA</button>
-</div>
-
-<div class="table-wrapper">
-    <table>
-        <thead>
-            <tr>
-                <th>AIKA</th>
-                <th>REITTI</th>
-                <th>MATKUSTAJA</th>
-                <th>PUHELIN</th>
-                <th>TILAAJA</th>
-                <th>HINTA</th>
-                <th>LASKU</th>
-                <th>HUOMIO / POIKKEAMAT</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody id="logs"></tbody>
-    </table>
-</div>
-```
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-    const firebaseConfig = { apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs", authDomain: "jsailing-f716c.firebaseapp.com", projectId: "jsailing-f716c", storageBucket: "jsailing-f716c.firebasestorage.app", appId: "1:543523103696:web:439a312efa6aec398a8fd5" };
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-
-    let currentLogs = [];
-    let editId = null;
-
-    onAuthStateChanged(auth, (u) => { if(u) startListening(); else signInWithPopup(auth, provider); });
-
-    // Kellonajan puhdistus ja validaatio HH:mm muotoon
-    const formatTime = (t) => {
-        if (!t) return "00:00";
-        let clean = t.replace(/[^\d]/g, '');
-        
-        if (clean.length >= 3) {
-            if (clean.length === 3) clean = '0' + clean;
-            if (clean.length >= 4) {
-                let hours = parseInt(clean.substring(0, 2));
-                let minutes = parseInt(clean.substring(2, 4));
-                
-                // Validaatio: tunti 0-23, minuutit 0-59
-                if (isNaN(hours) || isNaN(minutes)) return "00:00";
-                hours = Math.max(0, Math.min(23, hours));
-                minutes = Math.max(0, Math.min(59, minutes));
-                
-                return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
-            }
-        }
-        return t.replace('.', ':');
-    };
-
-    // Päivämäärän automaattinen täydennys nykyisellä vuodella
-    const formatDate = (dateStr) => {
-        if (!dateStr) return "";
-        const parts = dateStr.split('.');
-        if (parts.length === 2) {
-            return `${parts[0]}.${parts[1]}.${new Date().getFullYear()}`;
-        }
-        return dateStr;
-    };
-
-    window.parseMessage = () => {
-        if (editId) return;
-        const txt = document.getElementById('msgInput').value;
-        const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        
-        let pvmM = txt.match(/(\d{1,2})\.(\d{1,2})/);
-        if (pvmM) document.getElementById('inPvm').value = formatDate(pvmM[0]);
-        
-        // Parempi kellonajan etsintä ja validaatio
-        let kloMatch = txt.match(/(\d{1,2})[.:](\d{2})/) || txt.match(/klo\s*(\d{4})/i) || txt.match(/klo\s*(\d{1,2})/i);
-        document.getElementById('inKlo').value = kloMatch ? formatTime(kloMatch[0].replace(/klo/i, '').trim()) : "";
-        
-        const hintaMatch = txt.match(/(\d{1,3})\s*[e€]/i);
-        document.getElementById('inHinta').value = hintaMatch ? hintaMatch[1] : "";
-        document.getElementById('inTyyppi').value = txt.toLowerCase().includes('vip') ? 'VIP' : 'Normaali';
-        
-        const fIdx = lines.findIndex(l => l.toLowerCase().match(/lähtö|nouto/));
-        document.getElementById('inFrom').value = (fIdx !== -1 && lines[fIdx+1]) ? lines[fIdx+1] : "";
-
-        const tIdx = lines.findIndex(l => l.toLowerCase().match(/meno|kohde/));
-        document.getElementById('inTo').value = (tIdx !== -1 && lines[tIdx+1]) ? lines[tIdx+1] : "";
-        
-        const nIdx = lines.findIndex(l => l.toLowerCase().match(/kyytiin/));
-        let passenger = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1].replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim() : "";
-        document.getElementById('inNimi').value = passenger;
-
-        const sIdx = lines.findIndex(l => l.toLowerCase().match(/tilaaja|til:|tilaus/));
-        let ordererVal = "";
-        if (sIdx !== -1) {
-            let line = lines[sIdx];
-            ordererVal = line.includes(':') ? line.split(':')[1].replace(/[\/]/g, '').trim() : (lines[sIdx+1] || "").replace(/[\/]/g, '').trim();
-        }
-        document.getElementById('inTilaaja').value = ordererVal;
-
-        let billVal = "Asiakas maksaa";
-        if (txt.toLowerCase().includes("fortum")) billVal = "FORTUM";
-        else if (txt.toLowerCase().includes("kone")) billVal = "KONE";
-        else {
-            const bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
-            if (bIdx !== -1 && lines[bIdx+1] && !lines[bIdx+1].toLowerCase().includes('ok?')) billVal = lines[bIdx+1];
-        }
-        document.getElementById('inLasku').value = billVal;
-
-        let phoneMatch = txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '';
-        document.getElementById('inPuhelin').value = phoneMatch;
-
-        let notes = lines.filter(l => 
-            !l.toLowerCase().match(/lähtö|meno|kyytiin|tilaaja|til:|lasku|ok\?|klo|nouto|kohde|huomenna/) &&
-            !l.match(/(\d{1,2})\.(\d{1,2})/) && 
-            l !== passenger && l !== ordererVal
-        ).join(' ').replace(/[\/]/g, '').replace(/\s\s+/g, ' ').trim();
-        
-        document.getElementById('inHuomio').value = notes;
-    };
-
-    function startListening() {
-        onSnapshot(query(collection(db, "taksitulot")), (snap) => {
-            const tbody = document.getElementById('logs');
-            tbody.innerHTML = '';
-            currentLogs = snap.docs.map(d => ({id: d.id, ...d.data()}));
-            
-            currentLogs.sort((a,b) => {
-                const k = (i) => {
-                    let p = (i.date || '01.01.' + new Date().getFullYear()).split('.');
-                    return `${p[2]||new Date().getFullYear()}-${(p[1]||'01').padStart(2,'0')}-${(p[0]||'01').padStart(2,'0')}-${(i.time||'00:00').replace('.',':')}`;
-                };
-                return k(b).localeCompare(k(a));
-            });
-
-            const now = new Date();
-            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-            const fragment = document.createDocumentFragment();
-            currentLogs.forEach(r => {
-                const tr = document.createElement('tr');
-                const p = (r.date || '').split('.');
-                const rD = new Date(parseInt(p[2]||2026), parseInt(p[1]||1)-1, parseInt(p[0]||1));
-                tr.className = rD >= today ? 'row-future' : 'row-past';
-                
-                tr.innerHTML = `
-                    <td><b style="font-size:1rem">${r.date}</b><br><span class="time-tag">${r.time || '00:00'}</span></td>
-                    <td><b>${r.from}</b><br>⬇<br><b>${r.to}</b></td>
-                    <td><b style="color:#fff">${r.customer}</b></td>
-                    <td><small style="color: var(--accent2); font-weight: bold;">${r.phone || '-'}</small></td>
-                    <td>${r.orderer || '-'}</td>
-                    <td><span class="price-tag">${r.price}€</span><br><b>${r.type}</b></td>
-                    <td><b style="color:var(--accent)">${r.billing || 'Asiakas maksaa'}</b></td>
-                    <td><small><span class="note-tag"><b>HUO:</b> ${r.notes || '-'}</span><br><span class="deviation-tag"><b>POIK:</b> ${r.deviation || '-'}</span></small></td>
-                    <td>
-                        <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
-                        <button class="action-btn" onclick="window.del('${r.id}')">✕</button>
-                    </td>
-                `;
-                fragment.appendChild(tr);
-            });
-            tbody.appendChild(fragment);
-        });
-    }
-
-    const cleanCSV = (str) => {
-        if (!str) return "";
-        return str.toString().replace(/;/g, ',').replace(/(\r\n|\n|\r)/gm, " ").trim();
-    };
-
-    window.exportToCSV = () => {
-        let csv = "\uFEFFPvm;Klo;Lahto;Meno;Matkustaja;Puhelin;Hinta;Tyyppi;Lasku;Tilaaja;Huomio;Poikkeamat\n";
-        currentLogs.forEach(r => {
-            let csvTime = formatTime(r.time);
-            csv += `${cleanCSV(r.date)};${csvTime};${cleanCSV(r.from)};${cleanCSV(r.to)};${cleanCSV(r.customer)};${cleanCSV(r.phone)};${cleanCSV(r.price)};${cleanCSV(r.type)};${cleanCSV(r.billing)};${cleanCSV(r.orderer)};${cleanCSV(r.notes)};${cleanCSV(r.deviation)}\n`;
-        });
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `ajot_${new Date().toLocaleDateString('fi-FI')}.csv`;
-        link.click();
-    };
-
-    window.prepareEdit = (id) => {
-        const item = currentLogs.find(l => l.id === id);
-        editId = id;
-        document.getElementById('inPvm').value = item.date;
-        document.getElementById('inKlo').value = item.time;
-        document.getElementById('inHinta').value = item.price;
-        document.getElementById('inTyyppi').value = item.type;
-        document.getElementById('inFrom').value = item.from;
-        document.getElementById('inTo').value = item.to;
-        document.getElementById('inNimi').value = item.customer;
-        document.getElementById('inPuhelin').value = item.phone || "";
-        document.getElementById('inTilaaja').value = item.orderer || "";
-        document.getElementById('inLasku').value = item.billing || "";
-        document.getElementById('inHuomio').value = item.notes || "";
-        document.getElementById('inPoikkeama').value = item.deviation || "";
-        
-        // Visuaalinen feedback edit-tilaan
-        document.getElementById('editModeIndicator').classList.add('active');
-        document.getElementById('btnSave').textContent = "PÄIVITÄ TILAUS";
-        document.getElementById('btnSave').classList.add('edit-mode');
-        document.getElementById('btnCancel').classList.add('show');
-        document.getElementById('msgInput').value = '';
-        
-        window.scrollTo(0, 0);
-    };
-
-    window.cancelEdit = () => {
-        editId = null;
-        document.getElementById('editModeIndicator').classList.remove('active');
-        document.getElementById('btnSave').textContent = "TALLENNA TILAUS";
-        document.getElementById('btnSave').classList.remove('edit-mode');
-        document.getElementById('btnCancel').classList.remove('show');
-        document.getElementById('msgInput').value = '';
-        document.querySelectorAll('.manual-fields input').forEach(i => i.value = '');
-    };
-
-    document.getElementById('btnSave').onclick = async () => {
-        const txt = document.getElementById('msgInput').value;
-        const hinta = document.getElementById('inHinta').value;
-        const rawTime = document.getElementById('inKlo').value;
-        
-        // Jos ei editoinnissa, yritä parsita puhelinnumero viestistä
         let phoneVal = document.getElementById('inPuhelin').value;
         if (!editId && !phoneVal) {
             let phoneMatch = txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '';
