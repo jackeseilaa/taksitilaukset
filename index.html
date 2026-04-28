@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V37.8</title>
+    <title>Kuljetuskirja V37.9</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -75,7 +75,39 @@
     th { text-align: left; color: #ffffff; padding: 15px 10px; border-bottom: 2px solid var(--accent); background: #000; text-transform: uppercase; font-weight: 900; }
     td { padding: 12px 10px; border-bottom: 1px solid #333; vertical-align: top; }
     
-    /* PARANNETTU VÄRIKONTRASTI: row-future ja row-past */
+    /* PARANNETTU VÄRIKONTRASTI: row-today, row-future ja row-past */
+    .row-today { 
+        background-color: #d4f8a0 !important; 
+    }
+    .row-today td {
+        color: #000000 !important;
+    }
+    .row-today b, 
+    .row-today strong { 
+        color: #000000 !important; 
+    }
+    .row-today small { 
+        color: #000000 !important; 
+    }
+    .row-today span { 
+        color: #000000 !important; 
+    }
+    .row-today .price-tag {
+        background: var(--price-bg) !important;
+        color: var(--price-text) !important;
+    }
+    .row-today .time-tag {
+        color: #004499 !important;
+        font-weight: 700;
+    }
+    .row-today .note-tag {
+        color: #004499 !important;
+    }
+    .row-today .deviation-tag {
+        color: #cc0000 !important;
+        font-weight: bold;
+    }
+
     .row-future { 
         background-color: var(--future-bg) !important; 
     }
@@ -167,7 +199,7 @@
 <body>
 
 ```
-<div class="v-tag">VERSIO 37.8 (CHANGED FUTURE ROWS COLOR: DARK BLUE BACKGROUND)</div>
+<div class="v-tag">VERSIO 37.9 (SEPARATED TODAY/TOMORROW COLORS: YELLOW TODAY, BLUE TOMORROW+)</div>
 <h1>KULJETUSKIRJA</h1>
 
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
@@ -435,13 +467,23 @@
 
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
 
             const fragment = document.createDocumentFragment();
             currentLogs.forEach(r => {
                 const tr = document.createElement('tr');
                 const p = (r.date || '').split('.');
                 const rD = new Date(parseInt(p[2]||2026), parseInt(p[1]||1)-1, parseInt(p[0]||1));
-                tr.className = rD >= today ? 'row-future' : 'row-past';
+                
+                // Erottele: tänään (row-today), huomenna+ (row-future), menneisyys (row-past)
+                if (rD < today) {
+                    tr.className = 'row-past';
+                } else if (rD >= today && rD < tomorrow) {
+                    tr.className = 'row-today';
+                } else {
+                    tr.className = 'row-future';
+                }
                 
                 // Google Maps -linkit osoitteille
                 const mapsUrl = (address) => {
