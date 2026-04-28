@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V37.5</title>
+    <title>Kuljetuskirja V37.6</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -167,7 +167,7 @@
 <body>
 
 ```
-<div class="v-tag">VERSIO 37.5 (FIXED TILAAJA PARSING WITH SLASH)</div>
+<div class="v-tag">VERSIO 37.6 (FIXED PRICE REGEX: NO 1MIN, ADDED MAKSU AUTOON)</div>
 <h1>KULJETUSKIRJA</h1>
 
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
@@ -309,8 +309,9 @@
         }
         document.getElementById('inAuto').value = autoVal;
         
-        // PARANNETTU HINTA-PARSINTA: etsi numero joka on suoraan € tai e merkinnän edellä
-        let hintaMatch = txt.match(/(\d+)\s*[e€]/i);
+        // PARANNETTU HINTA-PARSINTA: etsi numero joka on VÄLITTÖMÄSTI € tai e merkinnän edellä
+        // Jätä välistä "1min", "5min" jne. — ota vain oikea hinta
+        let hintaMatch = txt.match(/\b(\d+)\s*[e€]\b/i);
         document.getElementById('inHinta').value = hintaMatch ? hintaMatch[1] : "";
         
         let typeVal = "Normaali";
@@ -363,7 +364,10 @@
             billVal = "FORTUM";
         } else if (txt.toLowerCase().includes("kone")) {
             billVal = "KONE";
+        } else if (txt.toLowerCase().includes("maksu autoon")) {
+            billVal = "Maksu autoon";
         } else {
+            // Etsi rivi joka sisältää "lasku" tai "/ lasku"
             const bIdx = lines.findIndex(l => l.toLowerCase().match(/lasku|\/\s*lasku/i));
             if (bIdx !== -1) {
                 let line = lines[bIdx];
@@ -399,12 +403,13 @@
         }
         document.getElementById('inPoikkeama').value = deviationVal;
 
-        // Huomiot: suodata pois komennot, pvm, puhelinumerot, poikkeamat
+        // Huomiot: suodata pois komennot, pvm, puhelinumerot, poikkeamat, maksutiedot
         let notes = lines.filter(l => 
             !l.toLowerCase().match(/^lähtö|^meno|^kyytiin|^nimi:|^nimet:|tilaaja|til:|lasku|^klo|^nouto|^kohde|^huomenna/) &&
             !l.match(/^(\d{1,2})\.(\d{1,2})/) &&
             !l.toLowerCase().match(/^ok\?|^ok/) &&
             !l.match(/^\+?\d[\d\s-]{8,}/) &&
+            !l.toLowerCase().match(/maksu\s*autoon|maksu/) &&
             l !== passenger && l !== ordererVal &&
             !l.toLowerCase().match(/odotus|extra|lisä|ylimenev|kulutus/) &&
             !l.match(/^\d+\s*[e€]/)
