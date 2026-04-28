@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V37.2</title>
+    <title>Kuljetuskirja V37.3</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -75,8 +75,70 @@
     th { text-align: left; color: #ffffff; padding: 15px 10px; border-bottom: 2px solid var(--accent); background: #000; text-transform: uppercase; font-weight: 900; }
     td { padding: 12px 10px; border-bottom: 1px solid #333; vertical-align: top; }
     
-    .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
-    .row-past { background-color: #111111 !important; color: #ffffff !important; }
+    /* PARANNETTU VÄRIKONTRASTI: row-future ja row-past */
+    .row-future { 
+        background-color: var(--future-bg) !important; 
+    }
+    .row-future td {
+        color: var(--future-text) !important;
+    }
+    .row-future b, 
+    .row-future strong { 
+        color: var(--future-text) !important; 
+    }
+    .row-future small { 
+        color: var(--future-text) !important; 
+    }
+    .row-future span { 
+        color: var(--future-text) !important; 
+    }
+    .row-future .price-tag {
+        background: var(--price-bg) !important;
+        color: var(--price-text) !important;
+    }
+    .row-future .time-tag {
+        color: #004499 !important;
+        font-weight: 700;
+    }
+    .row-future .note-tag {
+        color: #004499 !important;
+    }
+    .row-future .deviation-tag {
+        color: #cc0000 !important;
+        font-weight: bold;
+    }
+
+    .row-past { 
+        background-color: #111111 !important; 
+    }
+    .row-past td {
+        color: #ffffff !important;
+    }
+    .row-past b, 
+    .row-past strong { 
+        color: #ffffff !important; 
+    }
+    .row-past small { 
+        color: #ffffff !important; 
+    }
+    .row-past span { 
+        color: #ffffff !important; 
+    }
+    .row-past .price-tag {
+        background: var(--price-bg) !important;
+        color: var(--price-text) !important;
+    }
+    .row-past .time-tag {
+        color: var(--accent2) !important;
+        font-weight: 700;
+    }
+    .row-past .note-tag {
+        color: var(--accent2) !important;
+    }
+    .row-past .deviation-tag {
+        color: #ff6666 !important;
+        font-weight: bold;
+    }
     
     .price-tag { font-weight: 900; color: var(--price-text); background: var(--price-bg); padding: 4px 8px; border-radius: 4px; display: inline-block; font-size: 1rem; box-shadow: 2px 2px 0px #000; }
     .time-tag { font-size: 1.1rem; color: var(--accent2); font-weight: 700; }
@@ -92,7 +154,7 @@
 <body>
 
 ```
-<div class="v-tag">VERSIO 37.2 (FIXED PARSING: NIMI/TILAAJA/LASKULLE PREFIX, EXACT PRICE)</div>
+<div class="v-tag">VERSIO 37.3 (FIXED COLOR CONTRAST: FUTURE/PAST ROWS)</div>
 <h1>KULJETUSKIRJA</h1>
 
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
@@ -217,7 +279,6 @@
         document.getElementById('inKlo').value = kloMatch ? formatTime(kloMatch[0].replace(/klo/i, '').trim()) : "";
         
         // PARANNETTU HINTA-PARSINTA: etsi numero joka on suoraan € tai e merkinnän edellä
-        // Esim "70e vip", "100e", "55e VIP" — ottaa vain oikean numeron
         let hintaMatch = txt.match(/(\d+)\s*[e€]/i);
         document.getElementById('inHinta').value = hintaMatch ? hintaMatch[1] : "";
         
@@ -239,7 +300,7 @@
         if (nIdx !== -1 && lines[nIdx+1]) {
             passenger = lines[nIdx+1]
                 .replace(/[\/]/g, '')
-                .replace(/\+?\d[\d\s-]{7,}/, '') // poista puhelinnumerot
+                .replace(/\+?\d[\d\s-]{7,}/, '')
                 .trim();
         }
         document.getElementById('inNimi').value = passenger;
@@ -249,11 +310,9 @@
         const orderIdx = lines.findIndex(l => l.toLowerCase().match(/tilaaja|\/\s*tilaaja/i));
         if (orderIdx !== -1) {
             let line = lines[orderIdx];
-            // Jos rivillä on ":", ota : jälkeinen osa
             if (line.includes(':')) {
                 ordererVal = line.split(':')[1].replace(/[\/]/g, '').trim();
             } else if (lines[orderIdx+1]) {
-                // Muuten ota seuraava rivi
                 ordererVal = lines[orderIdx+1].replace(/[\/]/g, '').trim();
             }
         }
@@ -266,18 +325,15 @@
         } else if (txt.toLowerCase().includes("kone")) {
             billVal = "KONE";
         } else {
-            // Etsi rivi joka sisältää "lasku" tai "/ lasku"
             const bIdx = lines.findIndex(l => l.toLowerCase().match(/lasku|\/\s*lasku/i));
             if (bIdx !== -1) {
                 let line = lines[bIdx];
-                // Jos rivillä on ":", ota : jälkeinen osa
                 if (line.includes(':')) {
                     let afterColon = line.split(':')[1].trim();
                     if (afterColon && !afterColon.toLowerCase().match(/^ok\?/)) {
                         billVal = afterColon;
                     }
                 } else {
-                    // Muuten etsi seuraava rivi joka ei ole tyhjä tai "Ok?"
                     for (let i = bIdx + 1; i < lines.length; i++) {
                         if (lines[i] && !lines[i].toLowerCase().match(/^ok\?|^ok/)) {
                             billVal = lines[i];
@@ -345,11 +401,11 @@
                 tr.innerHTML = `
                     <td><b style="font-size:1rem">${r.date}</b><br><span class="time-tag">${r.time || '00:00'}</span></td>
                     <td><b>${r.from}</b><br>⬇<br><b>${r.to}</b></td>
-                    <td><b style="color:#fff">${r.customer}</b></td>
-                    <td><small style="color: var(--accent2); font-weight: bold;">${r.phone || '-'}</small></td>
+                    <td><b>${r.customer}</b></td>
+                    <td><small>${r.phone || '-'}</small></td>
                     <td>${r.orderer || '-'}</td>
                     <td><span class="price-tag">${r.price}€</span><br><b>${r.type}</b></td>
-                    <td><b style="color:var(--accent)">${r.billing || 'Asiakas maksaa'}</b></td>
+                    <td><b>${r.billing || 'Asiakas maksaa'}</b></td>
                     <td><small><span class="note-tag"><b>HUO:</b> ${r.notes || '-'}</span><br><span class="deviation-tag"><b>POIK:</b> ${r.deviation || '-'}</span></small></td>
                     <td>
                         <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
