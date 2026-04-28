@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V37.1</title>
+    <title>Kuljetuskirja V37.2</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -92,7 +92,7 @@
 <body>
 
 ```
-<div class="v-tag">VERSIO 37.1 (IMPROVED PARSING: HUOMENNA, OK?, POIKKEAMA)</div>
+<div class="v-tag">VERSIO 37.2 (FIXED PARSING: NIMI/TILAAJA/LASKULLE PREFIX, EXACT PRICE)</div>
 <h1>KULJETUSKIRJA</h1>
 
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
@@ -216,8 +216,9 @@
         let kloMatch = txt.match(/(\d{1,2})[.:](\d{2})/) || txt.match(/klo\s*(\d{4})/i) || txt.match(/klo\s*(\d{1,2})/i);
         document.getElementById('inKlo').value = kloMatch ? formatTime(kloMatch[0].replace(/klo/i, '').trim()) : "";
         
-        // Hinta + tyyppi yhdessä: "70e vip" → hinta 70, tyyppi VIP
-        const hintaMatch = txt.match(/(\d{1,3})\s*[e€]/i);
+        // PARANNETTU HINTA-PARSINTA: etsi numero joka on suoraan € tai e merkinnän edellä
+        // Esim "70e vip", "100e", "55e VIP" — ottaa vain oikean numeron
+        let hintaMatch = txt.match(/(\d+)\s*[e€]/i);
         document.getElementById('inHinta').value = hintaMatch ? hintaMatch[1] : "";
         
         let typeVal = "Normaali";
@@ -226,38 +227,62 @@
         }
         document.getElementById('inTyyppi').value = typeVal;
         
-        const fIdx = lines.findIndex(l => l.toLowerCase().match(/lähtö|nouto/));
+        const fIdx = lines.findIndex(l => l.toLowerCase().match(/^lähtö|^nouto/));
         document.getElementById('inFrom').value = (fIdx !== -1 && lines[fIdx+1]) ? lines[fIdx+1] : "";
 
-        const tIdx = lines.findIndex(l => l.toLowerCase().match(/meno|kohde/));
+        const tIdx = lines.findIndex(l => l.toLowerCase().match(/^meno|^kohde/));
         document.getElementById('inTo').value = (tIdx !== -1 && lines[tIdx+1]) ? lines[tIdx+1] : "";
         
-        const nIdx = lines.findIndex(l => l.toLowerCase().match(/kyytiin/));
-        let passenger = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1].replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim() : "";
+        // PARANNETTU: Tunnista "Kyytiin", "Nimi:", "Nimet:"
+        const nIdx = lines.findIndex(l => l.toLowerCase().match(/^kyytiin|^nimi:|^nimet:/));
+        let passenger = "";
+        if (nIdx !== -1 && lines[nIdx+1]) {
+            passenger = lines[nIdx+1]
+                .replace(/[\/]/g, '')
+                .replace(/\+?\d[\d\s-]{7,}/, '') // poista puhelinnumerot
+                .trim();
+        }
         document.getElementById('inNimi').value = passenger;
 
-        const sIdx = lines.findIndex(l => l.toLowerCase().match(/tilaaja|til:|tilaus/));
+        // PARANNETTU TILAAJA: "tilaaja:", "Tilaaja:", "/ tilaaja:" — kaikki muodot
         let ordererVal = "";
-        if (sIdx !== -1) {
-            let line = lines[sIdx];
-            ordererVal = line.includes(':') ? line.split(':')[1].replace(/[\/]/g, '').trim() : (lines[sIdx+1] || "").replace(/[\/]/g, '').trim();
+        const orderIdx = lines.findIndex(l => l.toLowerCase().match(/tilaaja|\/\s*tilaaja/i));
+        if (orderIdx !== -1) {
+            let line = lines[orderIdx];
+            // Jos rivillä on ":", ota : jälkeinen osa
+            if (line.includes(':')) {
+                ordererVal = line.split(':')[1].replace(/[\/]/g, '').trim();
+            } else if (lines[orderIdx+1]) {
+                // Muuten ota seuraava rivi
+                ordererVal = lines[orderIdx+1].replace(/[\/]/g, '').trim();
+            }
         }
         document.getElementById('inTilaaja').value = ordererVal;
 
-        // Parannettu LASKU-detektio: ignoroi "Ok?" rivit
+        // PARANNETTU LASKU: "Lasku", "/ laskulle", "laskulle" — kaikki muodot, ignoroi "Ok?"
         let billVal = "Asiakas maksaa";
         if (txt.toLowerCase().includes("fortum")) {
             billVal = "FORTUM";
         } else if (txt.toLowerCase().includes("kone")) {
             billVal = "KONE";
         } else {
-            const bIdx = lines.findIndex(l => l.toLowerCase().includes('lasku'));
+            // Etsi rivi joka sisältää "lasku" tai "/ lasku"
+            const bIdx = lines.findIndex(l => l.toLowerCase().match(/lasku|\/\s*lasku/i));
             if (bIdx !== -1) {
-                // Etsi seuraava rivi joka ei ole tyhjä, "Ok?" tai muu ignoroitava
-                for (let i = bIdx + 1; i < lines.length; i++) {
-                    if (lines[i] && !lines[i].toLowerCase().match(/^ok\?|^ok/)) {
-                        billVal = lines[i];
-                        break;
+                let line = lines[bIdx];
+                // Jos rivillä on ":", ota : jälkeinen osa
+                if (line.includes(':')) {
+                    let afterColon = line.split(':')[1].trim();
+                    if (afterColon && !afterColon.toLowerCase().match(/^ok\?/)) {
+                        billVal = afterColon;
+                    }
+                } else {
+                    // Muuten etsi seuraava rivi joka ei ole tyhjä tai "Ok?"
+                    for (let i = bIdx + 1; i < lines.length; i++) {
+                        if (lines[i] && !lines[i].toLowerCase().match(/^ok\?|^ok/)) {
+                            billVal = lines[i];
+                            break;
+                        }
                     }
                 }
             }
@@ -267,10 +292,9 @@
         let phoneMatch = txt.match(/(\+?\d[\d\s-]{8,15})/)?.[0] || '';
         document.getElementById('inPuhelin').value = phoneMatch;
 
-        // Parannettu poikkeama-tunnistus ja huomio-suodatus
+        // Parannettu poikkeama-tunnistus
         let deviationVal = "";
         if (txt.toLowerCase().match(/odotus|extra|lisä|ylimenev|kulutus/)) {
-            // Etsitään poikkeamaan liittyvät numerot ja tekstit
             let devMatch = txt.match(/(odotus|extra|lisä|ylimenev|kulutus)[^.\n]*/gi);
             if (devMatch) {
                 deviationVal = devMatch.join('; ').substring(0, 100);
@@ -280,14 +304,15 @@
         }
         document.getElementById('inPoikkeama').value = deviationVal;
 
-        // Huomiot: suodata pois "Ok?", "Lasku", "huomenna", pvm, kellonaika jne
+        // Huomiot: suodata pois komennot, pvm, puhelinumerot, poikkeamat
         let notes = lines.filter(l => 
-            !l.toLowerCase().match(/lähtö|meno|kyytiin|tilaaja|til:|lasku|klo|nouto|kohde|huomenna/) &&
-            !l.match(/(\d{1,2})\.(\d{1,2})/) &&
+            !l.toLowerCase().match(/^lähtö|^meno|^kyytiin|^nimi:|^nimet:|tilaaja|til:|lasku|^klo|^nouto|^kohde|^huomenna/) &&
+            !l.match(/^(\d{1,2})\.(\d{1,2})/) &&
             !l.toLowerCase().match(/^ok\?|^ok/) &&
             !l.match(/^\+?\d[\d\s-]{8,}/) &&
             l !== passenger && l !== ordererVal &&
-            !l.toLowerCase().match(/odotus|extra|lisä|ylimenev|kulutus/)
+            !l.toLowerCase().match(/odotus|extra|lisä|ylimenev|kulutus/) &&
+            !l.match(/^\d+\s*[e€]/)
         ).join(' ').replace(/[\/]/g, '').replace(/\s\s+/g, ' ').trim();
         
         document.getElementById('inHuomio').value = notes;
@@ -371,7 +396,6 @@
         document.getElementById('inHuomio').value = item.notes || "";
         document.getElementById('inPoikkeama').value = item.deviation || "";
         
-        // Visuaalinen feedback edit-tilaan
         document.getElementById('editModeIndicator').classList.add('active');
         document.getElementById('btnSave').textContent = "PÄIVITÄ TILAUS";
         document.getElementById('btnSave').classList.add('edit-mode');
