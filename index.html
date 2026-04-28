@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V37.10</title>
+    <title>Kuljetuskirja V37.11</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -199,7 +199,7 @@
 <body>
 
 ```
-<div class="v-tag">VERSIO 37.10 (FIXED HUOMIO: REMOVED FROM/TO ADDRESSES)</div>
+<div class="v-tag">VERSIO 37.11 (ADDED DATE RANGE CSV PICKER)</div>
 <h1>KULJETUSKIRJA</h1>
 
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
@@ -224,13 +224,31 @@
 
 <div class="btn-row">
     <button class="btn-add" id="btnSave">TALLENNA TILAUS</button>
-    <button class="btn-csv" onclick="exportToCSV('all')">LATAA CSV - KAIKKI</button>
+    <button class="btn-csv" onclick="openDateRangeDialog()">LATAA CSV AJALTA</button>
     <button class="btn-csv" onclick="exportToCSV('today')">LATAA CSV - TÄNÄÄN</button>
     <button class="btn-csv" onclick="exportToCSV('month')">LATAA CSV - KUUKAUSI</button>
     <button class="btn-cancel" id="btnCancel">PERUUTA</button>
     <button class="btn-csv" id="btnSetSMB" style="background: #2a4a2a; border-color: #4a8a4a; color: #80ff80;">ASETA SMB TÄNÄÄN</button>
     <button class="btn-csv" id="btnClear" style="background: #3a2a2a; border-color: #8a4a4a; color: #ff8080;">TYHJENNÄ LOMAKE</button>
 </div>
+
+<!-- Päivämäärävälivalinta dialogi -->
+<div id="dateRangeDialog" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; border: 2px solid #c8f050; border-radius: 8px; padding: 20px; z-index: 1000; box-shadow: 0 0 20px rgba(0,0,0,0.9); min-width: 300px;">
+    <h3 style="color: #c8f050; margin-bottom: 15px;">Valitse ajanjaksso</h3>
+    <div style="margin-bottom: 10px;">
+        <label style="display: block; color: #50c8f0; font-size: 0.8rem; margin-bottom: 5px;">ALKUPÄIVÄ (pp.kk.yyyy)</label>
+        <input type="text" id="dateRangeStart" placeholder="01.01.2026" style="width: 100%; padding: 8px; background: #000; border: 1px solid #555; color: #fff; border-radius: 4px;">
+    </div>
+    <div style="margin-bottom: 15px;">
+        <label style="display: block; color: #50c8f0; font-size: 0.8rem; margin-bottom: 5px;">LOPPUPÄIVÄ (pp.kk.yyyy)</label>
+        <input type="text" id="dateRangeEnd" placeholder="31.12.2026" style="width: 100%; padding: 8px; background: #000; border: 1px solid #555; color: #fff; border-radius: 4px;">
+    </div>
+    <div style="display: flex; gap: 8px;">
+        <button onclick="exportToDateRange()" style="flex: 1; background: #c8f050; color: black; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">LATAA CSV</button>
+        <button onclick="closeDateRangeDialog()" style="flex: 1; background: #555; color: white; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">PERUUTA</button>
+    </div>
+</div>
+<div id="dateRangeOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999;" onclick="closeDateRangeDialog()"></div>
 
 <div class="table-wrapper">
     <table>
@@ -690,6 +708,77 @@
     };
 
     document.getElementById('btnClear').onclick = window.clearForm;
+
+    // Avaa päivämäärävälivalinta dialogi
+    window.openDateRangeDialog = () => {
+        document.getElementById('dateRangeDialog').style.display = 'block';
+        document.getElementById('dateRangeOverlay').style.display = 'block';
+        // Täytä oletusarvot: tänään - kuukauden loppu
+        const today = new Date();
+        const startDate = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
+        const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const endDateStr = `${String(endDate.getDate()).padStart(2, '0')}.${String(endDate.getMonth() + 1).padStart(2, '0')}.${endDate.getFullYear()}`;
+        document.getElementById('dateRangeStart').value = startDate;
+        document.getElementById('dateRangeEnd').value = endDateStr;
+    };
+
+    // Sulje dialogi
+    window.closeDateRangeDialog = () => {
+        document.getElementById('dateRangeDialog').style.display = 'none';
+        document.getElementById('dateRangeOverlay').style.display = 'none';
+    };
+
+    // Lataa CSV päivämääräväliltä
+    window.exportToDateRange = () => {
+        const startStr = document.getElementById('dateRangeStart').value;
+        const endStr = document.getElementById('dateRangeEnd').value;
+        
+        if (!startStr || !endStr) {
+            alert('Täytä molemmat päivämäärät (pp.kk.yyyy muodossa)');
+            return;
+        }
+        
+        // Parse päivämäärät
+        const parseDateStr = (dateStr) => {
+            const parts = dateStr.split('.');
+            if (parts.length !== 3) return null;
+            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        };
+        
+        const startDate = parseDateStr(startStr);
+        const endDate = parseDateStr(endStr);
+        
+        if (!startDate || !endDate) {
+            alert('Virheellinen päivämäärä muoto. Käytä pp.kk.yyyy');
+            return;
+        }
+        
+        // Filtteröi tilaukset päivämäärävälin mukaan
+        const filtered = currentLogs.filter(r => {
+            const rDate = parseDateStr(r.date);
+            return rDate && rDate >= startDate && rDate <= endDate;
+        });
+        
+        if (filtered.length === 0) {
+            alert(`Ei tilauksia ajanjaksolla ${startStr} - ${endStr}`);
+            return;
+        }
+        
+        // Luo CSV
+        let csv = "\uFEFFPvm;Klo;Auto;Lahto;Meno;Matkustaja;Puhelin;Hinta;Tyyppi;Lasku;Tilaaja;Huomio;Poikkeamat\n";
+        filtered.forEach(r => {
+            let csvTime = formatTime(r.time);
+            csv += `${cleanCSV(r.date)};${csvTime};${cleanCSV(r.car)};${cleanCSV(r.from)};${cleanCSV(r.to)};${cleanCSV(r.customer)};${cleanCSV(r.phone)};${cleanCSV(r.price)};${cleanCSV(r.type)};${cleanCSV(r.billing)};${cleanCSV(r.orderer)};${cleanCSV(r.notes)};${cleanCSV(r.deviation)}\n`;
+        });
+        
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `ajot_${startStr}_${endStr}.csv`;
+        link.click();
+        
+        closeDateRangeDialog();
+    };
 </script>
 
 </body>
