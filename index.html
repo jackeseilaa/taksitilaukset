@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V37.4</title>
+    <title>Kuljetuskirja V37.5</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -167,7 +167,7 @@
 <body>
 
 ```
-<div class="v-tag">VERSIO 37.4 (AUTO FIELD + GOOGLE MAPS + SET SMB TODAY)</div>
+<div class="v-tag">VERSIO 37.5 (FIXED TILAAJA PARSING WITH SLASH)</div>
 <h1>KULJETUSKIRJA</h1>
 
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
@@ -341,8 +341,16 @@
         const orderIdx = lines.findIndex(l => l.toLowerCase().match(/tilaaja|\/\s*tilaaja/i));
         if (orderIdx !== -1) {
             let line = lines[orderIdx];
+            // Jos rivillä on ":", ota : jälkeinen osa
             if (line.includes(':')) {
-                ordererVal = line.split(':')[1].replace(/[\/]/g, '').trim();
+                let afterColon = line.split(':')[1].trim();
+                // Jos : jälkeen on vielä tekstiä, käytä sitä
+                if (afterColon && afterColon.length > 0) {
+                    ordererVal = afterColon.replace(/[\/]/g, '').trim();
+                } else if (lines[orderIdx+1]) {
+                    // Muuten ota seuraava rivi
+                    ordererVal = lines[orderIdx+1].replace(/[\/]/g, '').trim();
+                }
             } else if (lines[orderIdx+1]) {
                 ordererVal = lines[orderIdx+1].replace(/[\/]/g, '').trim();
             }
