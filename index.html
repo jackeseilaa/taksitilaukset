@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V37.9</title>
+    <title>Kuljetuskirja V37.10</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -199,7 +199,7 @@
 <body>
 
 ```
-<div class="v-tag">VERSIO 37.9 (SEPARATED TODAY/TOMORROW COLORS: YELLOW TODAY, BLUE TOMORROW+)</div>
+<div class="v-tag">VERSIO 37.10 (FIXED HUOMIO: REMOVED FROM/TO ADDRESSES)</div>
 <h1>KULJETUSKIRJA</h1>
 
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
@@ -436,7 +436,10 @@
         }
         document.getElementById('inPoikkeama').value = deviationVal;
 
-        // Huomiot: suodata pois komennot, pvm, puhelinumerot, poikkeamat, maksutiedot
+        // Huomiot: suodata pois komennot, pvm, puhelinumerot, poikkeamat, maksutiedot JA lähtö/meno osoitteet
+        let fromVal = document.getElementById('inFrom').value;
+        let toVal = document.getElementById('inTo').value;
+        
         let notes = lines.filter(l => 
             !l.toLowerCase().match(/^lähtö|^meno|^kyytiin|^nimi:|^nimet:|tilaaja|til:|lasku|^klo|^nouto|^kohde|^huomenna/) &&
             !l.match(/^(\d{1,2})\.(\d{1,2})/) &&
@@ -444,6 +447,7 @@
             !l.match(/^\+?\d[\d\s-]{8,}/) &&
             !l.toLowerCase().match(/maksu\s*autoon|maksu/) &&
             l !== passenger && l !== ordererVal &&
+            l !== fromVal && l !== toVal &&  // UUSI: poistetaan lähtö ja meno rivit
             !l.toLowerCase().match(/odotus|extra|lisä|ylimenev|kulutus/) &&
             !l.match(/^\d+\s*[e€]/)
         ).join(' ').replace(/[\/]/g, '').replace(/\s\s+/g, ' ').trim();
