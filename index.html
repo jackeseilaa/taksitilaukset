@@ -192,7 +192,9 @@
 
 <div class="btn-row">
     <button class="btn-add" id="btnSave">TALLENNA TILAUS</button>
-    <button class="btn-csv" onclick="exportToCSV()">LATAA CSV</button>
+    <button class="btn-csv" onclick="exportToCSV('all')">LATAA CSV - KAIKKI</button>
+    <button class="btn-csv" onclick="exportToCSV('today')">LATAA CSV - TÄNÄÄN</button>
+    <button class="btn-csv" onclick="exportToCSV('month')">LATAA CSV - KUUKAUSI</button>
     <button class="btn-cancel" id="btnCancel">PERUUTA</button>
     <button class="btn-csv" id="btnSetSMB" style="background: #2a4a2a; border-color: #4a8a4a; color: #80ff80;">ASETA SMB TÄNÄÄN</button>
 </div>
@@ -466,16 +468,42 @@
         return str.toString().replace(/;/g, ',').replace(/(\r\n|\n|\r)/gm, " ").trim();
     };
 
-    window.exportToCSV = () => {
+    window.exportToCSV = (filter = 'all') => {
+        const today = new Date();
+        const todayStr = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
+        const currentMonth = `${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
+        
+        let logsToExport = currentLogs;
+        let filename = 'ajot';
+        
+        if (filter === 'today') {
+            logsToExport = currentLogs.filter(r => r.date === todayStr);
+            filename = `ajot_tänään_${todayStr}`;
+        } else if (filter === 'month') {
+            logsToExport = currentLogs.filter(r => {
+                const logMonth = r.date.substring(3); // Otetaan kk.yyyy osasta
+                return logMonth === currentMonth;
+            });
+            filename = `ajot_kuukausi_${currentMonth}`;
+        } else {
+            filename = `ajot_kaikki_${new Date().toLocaleDateString('fi-FI')}`;
+        }
+        
+        if (logsToExport.length === 0) {
+            alert(`Ei tilauksia kategoriassa: ${filter}`);
+            return;
+        }
+        
         let csv = "\uFEFFPvm;Klo;Auto;Lahto;Meno;Matkustaja;Puhelin;Hinta;Tyyppi;Lasku;Tilaaja;Huomio;Poikkeamat\n";
-        currentLogs.forEach(r => {
+        logsToExport.forEach(r => {
             let csvTime = formatTime(r.time);
             csv += `${cleanCSV(r.date)};${csvTime};${cleanCSV(r.car)};${cleanCSV(r.from)};${cleanCSV(r.to)};${cleanCSV(r.customer)};${cleanCSV(r.phone)};${cleanCSV(r.price)};${cleanCSV(r.type)};${cleanCSV(r.billing)};${cleanCSV(r.orderer)};${cleanCSV(r.notes)};${cleanCSV(r.deviation)}\n`;
         });
+        
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = `ajot_${new Date().toLocaleDateString('fi-FI')}.csv`;
+        link.download = `${filename}.csv`;
         link.click();
     };
 
