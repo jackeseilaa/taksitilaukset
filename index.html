@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V36.8</title>
+    <title>Kuljetuskirja V36.9</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -33,20 +33,20 @@
         .row-future { background-color: var(--future-bg) !important; color: var(--future-text) !important; }
         .row-past { background-color: #111111 !important; color: #ffffff !important; }
         
-        .price-tag { font-weight: 900; color: #000; background: var(--price-bg); padding: 4px 8px; border-radius: 4px; display: inline-block; font-size: 1rem; box-shadow: 2px 2px 0px #000; }
+        .price-tag { font-weight: 900; color: #000; background: var(--price-bg); padding: 4px 8px; border-radius: 4px; display: inline-block; font-size: 1rem; }
         .time-tag { font-size: 1.2rem; color: var(--accent2); font-weight: 800; display: block; }
         
         /* VARMISTETTU AUTO-NÄKYVYYS */
         .auto-display { 
             background: #ffffff !important; 
             color: #000000 !important; 
-            padding: 4px 8px; 
+            padding: 5px 10px; 
             border-radius: 4px; 
-            font-size: 1rem; 
+            font-size: 1.1rem; 
             font-weight: 900; 
             display: inline-block;
             margin-top: 5px;
-            border: 2px solid #000;
+            border: 2px solid #ff0000; /* Punainen reuna korostaa, jos numero löytyy */
         }
 
         .action-btn { background: #222; border: 1px solid #444; font-size: 1.2rem; cursor: pointer; color: var(--accent2); padding: 8px; border-radius: 4px; }
@@ -54,7 +54,7 @@
 </head>
 <body>
 
-    <div class="v-tag">VERSIO 36.8 (DATA SCAN)</div>
+    <div class="v-tag">VERSIO 36.9 (RECOVERY MODE)</div>
     <h1>KULJETUSKIRJA</h1>
 
     <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -62,13 +62,13 @@
     <div class="manual-fields">
         <div><label>Pvm</label><input type="text" id="inPvm"></div>
         <div><label>Klo</label><input type="text" id="inKlo"></div>
-        <div><label>Auto (SMB / 154 jne)</label><input type="text" id="inAuto"></div>
+        <div><label>Auto</label><input type="text" id="inAuto" placeholder="Esim 154"></div>
         <div><label>Hinta (€)</label><input type="text" id="inHinta" style="background:#ffff00; color:#000;"></div>
         <div class="full-width"><label>Lähtö</label><input type="text" id="inFrom"></div>
         <div class="full-width"><label>Meno</label><input type="text" id="inTo"></div>
         <div><label>Matkustaja</label><input type="text" id="inNimi"></div>
-        <div><label>Lasku</label><input type="text" id="inLasku" style="color:var(--accent);"></div>
-        <div class="full-width"><label>Huomio / Poikkeama</label><input type="text" id="inHuomio"></div>
+        <div><label>Lasku</label><input type="text" id="inLasku" style="color:var(--accent); font-weight:bold;"></div>
+        <div class="full-width"><label>Huomio</label><input type="text" id="inHuomio"></div>
     </div>
 
     <button class="btn-add" id="btnSave">TALLENNA TILAUS</button>
@@ -101,6 +101,23 @@
 
     onAuthStateChanged(auth, (u) => { if(u) startListening(); else signInWithPopup(auth, provider); });
 
+    // TOIMINTO: Etsii auton numeroa mistä tahansa rivin kohdasta
+    function findVehicleDeep(obj) {
+        // 1. Kokeillaan tunnetut avaimet
+        const knownKeys = ['vehicle', 'auto', 'ajoneuvo', 'car', 'unit', 'autonro'];
+        for (let key of knownKeys) {
+            if (obj[key] && obj[key] !== "-") return obj[key];
+        }
+        // 2. Skannataan kaikki arvot ja etsitään SMB tai 3-numeroinen luku
+        for (let val of Object.values(obj)) {
+            if (typeof val === 'string') {
+                const match = val.match(/SMB\s*\d+/i) || val.match(/^\d{3}$/);
+                if (match) return match[0];
+            }
+        }
+        return "-";
+    }
+
     function startListening() {
         onSnapshot(query(collection(db, "taksitulot")), (snap) => {
             const tbody = document.getElementById('logs');
@@ -122,12 +139,12 @@
                 const rD = new Date(parseInt(p[2]||2026), parseInt(p[1]||1)-1, parseInt(p[0]||1));
                 tr.className = rD >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) ? 'row-future' : 'row-past';
                 
-                // SKANNATAAN KAIKKI MAHDOLLISET KENTÄT AUTOLLE
-                const autoValue = r.vehicle || r.auto || r.ajoneuvo || "-";
+                // Käytetään syväetsintää
+                const autoValue = findVehicleDeep(r);
 
                 tr.innerHTML = `
                     <td>
-                        <b style="font-size:0.9rem">${r.date || '-'}</b><br>
+                        <b>${r.date || '-'}</b><br>
                         <span class="time-tag">${r.time || '00:00'}</span>
                         <div class="auto-display">🚗 ${autoValue}</div>
                     </td>
@@ -174,7 +191,7 @@
         editId = id;
         document.getElementById('inPvm').value = item.date || "";
         document.getElementById('inKlo').value = item.time || "";
-        document.getElementById('inAuto').value = item.vehicle || item.auto || "";
+        document.getElementById('inAuto').value = findVehicleDeep(item);
         document.getElementById('inHinta').value = item.price || "";
         document.getElementById('inFrom').value = item.from || "";
         document.getElementById('inTo').value = item.to || "";
@@ -188,14 +205,13 @@
         const data = {
             date: document.getElementById('inPvm').value,
             time: document.getElementById('inKlo').value,
-            vehicle: document.getElementById('inAuto').value, // TALLENNETAAN NYT AINA TÄLLÄ NIMELLÄ
+            vehicle: document.getElementById('inAuto').value,
             price: document.getElementById('inHinta').value,
             from: document.getElementById('inFrom').value,
             to: document.getElementById('inTo').value,
             customer: document.getElementById('inNimi').value,
             billing: document.getElementById('inLasku').value,
-            notes: document.getElementById('inHuomio').value,
-            type: "Normaali"
+            notes: document.getElementById('inHuomio').value
         };
         if(editId) { await updateDoc(doc(db, "taksitulot", editId), data); editId = null; }
         else { await addDoc(collection(db, "taksitulot"), data); }
@@ -206,7 +222,7 @@
     window.exportSpecification = () => {
         let csv = "\uFEFFPvm;Klo;Auto;Matkustaja;Reitti;Hinta;Huomio\n";
         currentLogs.forEach(r => {
-            csv += `${r.date};${r.time};${r.vehicle || r.auto || '-'};${r.customer};${r.from} - ${r.to};${r.price};${r.notes}\n`;
+            csv += `${r.date};${r.time};${findVehicleDeep(r)};${r.customer};${r.from} - ${r.to};${r.price};${r.notes}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
