@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V36.4</title>
+    <title>Kuljetuskirja V36.5</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
         :root { 
@@ -38,12 +38,14 @@
         .row-past { background-color: #111111 !important; color: #ffffff !important; }
         
         .price-tag { font-weight: 900; color: #000; background: var(--price-bg); padding: 4px 8px; border-radius: 4px; display: inline-block; font-size: 1rem; }
+        .time-tag { font-size: 1.1rem; color: var(--accent2); font-weight: 800; }
+        .auto-tag { background: #444; color: #fff; padding: 2px 5px; border-radius: 3px; font-size: 0.7rem; margin-top: 2px; display: inline-block; }
         .action-btn { background: #222; border: 1px solid #444; font-size: 1.2rem; cursor: pointer; color: var(--accent2); padding: 8px; border-radius: 4px; margin-right: 5px; }
     </style>
 </head>
 <body>
 
-    <div class="v-tag">VERSIO 36.4 (SPECIFICATION EXPORT)</div>
+    <div class="v-tag">VERSIO 36.5 (VEHICLE INFO RESTORED)</div>
     <h1>KULJETUSKIRJA</h1>
 
     <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -51,12 +53,13 @@
     <div class="manual-fields">
         <div><label>Pvm</label><input type="text" id="inPvm"></div>
         <div><label>Klo</label><input type="text" id="inKlo"></div>
+        <div><label>Auto (esim 154 / SMB)</label><input type="text" id="inAuto"></div>
         <div><label>Hinta (€)</label><input type="text" id="inHinta" style="background:#ffff00; color:#000; font-weight:bold;"></div>
         <div><label>Tyyppi</label><input type="text" id="inTyyppi"></div>
+        <div><label>Tilaaja</label><input type="text" id="inTilaaja"></div>
         <div class="full-width"><label>Lähtö</label><input type="text" id="inFrom"></div>
         <div class="full-width"><label>Meno</label><input type="text" id="inTo"></div>
         <div><label>Matkustaja</label><input type="text" id="inNimi"></div>
-        <div><label>Tilaaja</label><input type="text" id="inTilaaja"></div>
         <div class="full-width"><label>Lasku / Maksaja</label><input type="text" id="inLasku" style="color:var(--accent); border: 1px solid var(--accent);"></div>
         <div class="full-width"><label>Huomio</label><input type="text" id="inHuomio"></div>
         <div class="full-width"><label style="color:#f0a050">Poikkeamat</label><input type="text" id="inPoikkeama"></div>
@@ -66,7 +69,7 @@
         <div class="btn-main-row">
             <button class="btn-add" id="btnSave">TALLENNA TILAUS</button>
         </div>
-        <button class="btn-spec" onclick="exportSpecification()">Lataa Tilaajan Erittely (Kuvan mukainen)</button>
+        <button class="btn-spec" onclick="exportSpecification()">Lataa Tilaajan Erittely (Auto mukana)</button>
         <button class="btn-csv" onclick="exportFullCSV()">Lataa Kaikki Tiedot (CSV)</button>
     </div>
 
@@ -74,7 +77,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>AIKA</th><th>REITTI</th><th>MATKUSTAJA</th><th>TILAAJA</th><th>HINTA</th><th>LASKU</th><th>HUOMIO</th><th></th>
+                    <th>AIKA / AUTO</th><th>REITTI</th><th>MATKUSTAJA</th><th>TILAAJA</th><th>HINTA</th><th>LASKU</th><th>HUOMIO</th><th></th>
                 </tr>
             </thead>
             <tbody id="logs"></tbody>
@@ -109,23 +112,22 @@
         return str.toString().replace(/;/g, ',').replace(/(\r\n|\n|\r)/gm, " ").trim();
     };
 
-    // UUSI: Tilaajan haluama erittely (Kuvan mukainen järjestys)
     window.exportSpecification = () => {
-        let csv = "\uFEFFPvm;Klo;Matkustaja;Reitti;Hinta;Huomio\n";
+        let csv = "\uFEFFPvm;Klo;Auto;Matkustaja;Reitti;Hinta;Huomio\n";
         currentLogs.forEach(r => {
             const reitti = `${r.from} - ${r.to}`;
             const huomiot = `${r.notes || ''} ${r.deviation ? ' | Poikkeama: ' + r.deviation : ''}`.trim();
-            csv += `${cleanCSV(r.date)};${cleanCSV(r.time)};${cleanCSV(r.customer)};${cleanCSV(reitti)};${cleanCSV(r.price)};${cleanCSV(huomiot)}\n`;
+            csv += `${cleanCSV(r.date)};${cleanCSV(r.time)};${cleanCSV(r.vehicle || '-')};${cleanCSV(r.customer)};${cleanCSV(reitti)};${cleanCSV(r.price)};${cleanCSV(huomiot)}\n`;
         });
         downloadCSV(csv, `erittely_${new Date().toLocaleDateString()}.csv`);
     };
 
     window.exportFullCSV = () => {
-        let csv = "\uFEFFPvm;Klo;Lahto;Meno;Matkustaja;Puhelin;Hinta;Tyyppi;Lasku;Tilaaja;Huomio;Poikkeamat\n";
+        let csv = "\uFEFFPvm;Klo;Auto;Lahto;Meno;Matkustaja;Puhelin;Hinta;Tyyppi;Lasku;Tilaaja;Huomio;Poikkeamat\n";
         currentLogs.forEach(r => {
-            csv += `${cleanCSV(r.date)};${cleanCSV(r.time)};${cleanCSV(r.from)};${cleanCSV(r.to)};${cleanCSV(r.customer)};${cleanCSV(r.phone)};${cleanCSV(r.price)};${cleanCSV(r.type)};${cleanCSV(r.billing)};${cleanCSV(r.orderer)};${cleanCSV(r.notes)};${cleanCSV(r.deviation)}\n`;
+            csv += `${cleanCSV(r.date)};${cleanCSV(r.time)};${cleanCSV(r.vehicle || '-')};${cleanCSV(r.from)};${cleanCSV(r.to)};${cleanCSV(r.customer)};${cleanCSV(r.phone)};${cleanCSV(r.price)};${cleanCSV(r.type)};${cleanCSV(r.billing)};${cleanCSV(r.orderer)};${cleanCSV(r.notes)};${cleanCSV(r.deviation)}\n`;
         });
-        downloadCSV(csv, `kuljetukset_kaikki_${new Date().toLocaleDateString()}.csv`);
+        downloadCSV(csv, `kaikki_tiedot_${new Date().toLocaleDateString()}.csv`);
     };
 
     function downloadCSV(csv, filename) {
@@ -140,19 +142,30 @@
         if (editId) return;
         const txt = document.getElementById('msgInput').value;
         const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        
         let pvmM = txt.match(/(\d{1,2})\.(\d{1,2})/);
         if (pvmM) document.getElementById('inPvm').value = pvmM[0].includes('2026') ? pvmM[0] : pvmM[0] + ".2026";
+        
         let kloMatch = txt.match(/(\d{1,2})[.:](\d{2})/) || txt.match(/klo\s*(\d{4})/i);
         document.getElementById('inKlo').value = kloMatch ? formatTime(kloMatch[0].replace(/klo/i, '').trim()) : "";
+
+        // AUTO-NUMERON POIMINTA (SMB tai 3-numeroinen luku)
+        let autoMatch = txt.match(/SMB\s*\d+/i) || txt.match(/\b\d{3}\b/);
+        document.getElementById('inAuto').value = autoMatch ? autoMatch[0].toUpperCase() : "";
+
         const hintaMatch = txt.match(/(\d{1,3})\s*[e€]/i);
         document.getElementById('inHinta').value = hintaMatch ? hintaMatch[1] : "";
         document.getElementById('inTyyppi').value = txt.toLowerCase().includes('vip') ? 'VIP' : 'Normaali';
+        
         const fIdx = lines.findIndex(l => l.toLowerCase().match(/lähtö|nouto/));
         document.getElementById('inFrom').value = (fIdx !== -1 && lines[fIdx+1]) ? lines[fIdx+1] : "";
+        
         const tIdx = lines.findIndex(l => l.toLowerCase().match(/meno|kohde/));
         document.getElementById('inTo').value = (tIdx !== -1 && lines[tIdx+1]) ? lines[tIdx+1] : "";
+        
         const nIdx = lines.findIndex(l => l.toLowerCase().match(/kyytiin/));
-        document.getElementById('inNimi').value = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1].replace(/[\/]/g, '').replace(/\+?\d[\d\s-]{7,}/, '').trim() : "";
+        document.getElementById('inNimi').value = (nIdx !== -1 && lines[nIdx+1]) ? lines[nIdx+1].replace(/[\/]/g, '').trim() : "";
+        
         document.getElementById('inLasku').value = txt.toLowerCase().includes("fortum") ? "FORTUM" : (txt.toLowerCase().includes("kone") ? "KONE" : "Asiakas maksaa");
     };
 
@@ -168,17 +181,22 @@
                 };
                 return k(b).localeCompare(k(a));
             });
-            const now = new Date();
-            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             currentLogs.forEach(r => {
                 const tr = document.createElement('tr');
                 const p = (r.date || '').split('.');
                 const rD = new Date(parseInt(p[2]||2026), parseInt(p[1]||1)-1, parseInt(p[0]||1));
+                const now = new Date();
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 tr.className = rD >= today ? 'row-future' : 'row-past';
+                
                 tr.innerHTML = `
-                    <td><b>${r.date}</b><br><span style="color:var(--accent2); font-weight:bold;">${r.time}</span></td>
+                    <td>
+                        <b style="font-size:0.95rem">${r.date}</b><br>
+                        <span class="time-tag">${r.time}</span><br>
+                        <span class="auto-tag">🚗 ${r.vehicle || '-'}</span>
+                    </td>
                     <td><b>${r.from}</b><br>⬇<br><b>${r.to}</b></td>
-                    <td><b>${r.customer}</b><br><small>${r.phone || ''}</small></td>
+                    <td><b>${r.customer}</b></td>
                     <td>${r.orderer || '-'}</td>
                     <td><span class="price-tag">${r.price}€</span><br><b>${r.type}</b></td>
                     <td><b style="color:var(--accent)">${r.billing}</b></td>
@@ -195,6 +213,7 @@
         editId = id;
         document.getElementById('inPvm').value = item.date;
         document.getElementById('inKlo').value = item.time;
+        document.getElementById('inAuto').value = item.vehicle || "";
         document.getElementById('inHinta').value = item.price;
         document.getElementById('inFrom').value = item.from;
         document.getElementById('inTo').value = item.to;
@@ -202,6 +221,8 @@
         document.getElementById('inLasku').value = item.billing;
         document.getElementById('inHuomio').value = item.notes;
         document.getElementById('inPoikkeama').value = item.deviation || "";
+        document.getElementById('inTyyppi').value = item.type || "Normaali";
+        document.getElementById('inTilaaja').value = item.orderer || "";
         window.scrollTo(0,0);
     };
 
@@ -209,6 +230,7 @@
         const data = {
             date: document.getElementById('inPvm').value,
             time: formatTime(document.getElementById('inKlo').value),
+            vehicle: document.getElementById('inAuto').value,
             price: document.getElementById('inHinta').value,
             from: document.getElementById('inFrom').value,
             to: document.getElementById('inTo').value,
@@ -217,7 +239,8 @@
             notes: document.getElementById('inHuomio').value,
             deviation: document.getElementById('inPoikkeama').value,
             type: document.getElementById('inTyyppi').value,
-            orderer: document.getElementById('inTilaaja').value
+            orderer: document.getElementById('inTilaaja').value,
+            phone: editId ? (currentLogs.find(l => l.id === editId)?.phone || '-') : ""
         };
         if(editId) { await updateDoc(doc(db, "taksitulot", editId), data); editId = null; }
         else { await addDoc(collection(db, "taksitulot"), data); }
