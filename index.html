@@ -3,84 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kuljetuskirja V37.6</title>
+    <title>Kuljetuskirja V38.0</title>
     <style>
-        :root { --bg: #000; --accent: #c8f050; --text: #fff; }
+        :root { --bg: #000; --accent: #c8f050; --text: #fff; --surface: #111; }
         body { font-family: sans-serif; background: var(--bg); color: var(--text); padding: 10px; }
-        .header-meta { color: #888; font-size: 10px; text-align: center; margin-bottom: 10px; }
-        h1 { text-align: center; color: var(--accent); font-size: 1.2rem; }
-        textarea { width: 100%; background: #111; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 60px; }
-        .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px; }
+        .header-meta { color: #888; font-size: 10px; text-align: center; margin-bottom: 5px; }
+        textarea { width: 100%; background: var(--surface); border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; }
+        .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
         input { background: #111; border: 1px solid #333; color: #fff; padding: 8px; }
         .full { grid-column: span 2; }
-        .btn { width: 100%; padding: 12px; margin-bottom: 5px; border: none; font-weight: bold; cursor: pointer; }
-        .btn-save { background: var(--accent); color: #000; }
-        .btn-csv { background: #0044ff; color: #fff; }
+        .btn { width: 100%; padding: 12px; margin-top: 5px; border: none; font-weight: bold; cursor: pointer; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        td { padding: 8px; border-bottom: 1px solid #333; font-size: 0.9rem; }
-        .auto-tag { background: #fff; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        td { padding: 8px; border-bottom: 1px solid #333; }
+        .act-btn { cursor: pointer; background: #222; border: 1px solid #444; color: #50c8f0; margin-left: 5px; }
     </style>
 </head>
 <body>
-    <div class="header-meta" id="statusHeader">VERSIO 37.6 | PÄIVITETTY: --:--</div>
-    <h1>KULJETUSKIRJA</h1>
-    
-    <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..."></textarea>
+    <div class="header-meta" id="statusHeader">VERSIO 38.0 | PÄIVITETTY: --:--</div>
+    <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
     <div class="fields">
-        <input id="inPvm" placeholder="Pvm">
-        <input id="inKlo" placeholder="Klo">
+        <input id="inPvm" placeholder="Pvm"> <input id="inKlo" placeholder="Klo">
         <input id="inAuto" class="full" placeholder="Auto">
         <input id="inFrom" class="full" placeholder="Lähtö">
         <input id="inTo" class="full" placeholder="Meno">
-        <input id="inNimi" placeholder="Matkustaja">
-        <input id="inHinta" placeholder="Hinta">
+        <input id="inNimi" placeholder="Matkustaja"> <input id="inHinta" placeholder="Hinta">
     </div>
-    <button class="btn btn-save" id="btnSave">TALLENNA TILAUS</button>
-    <button class="btn btn-csv" onclick="exportSpecification()">Lataa erittely (CSV)</button>
-
+    <button class="btn" style="background:var(--accent)" id="btnSave">TALLENNA TILAUS</button>
+    <button class="btn" style="background:#0044ff; color:#fff" onclick="exportSpecification()">Lataa erittely (CSV)</button>
     <table id="logsTable"><tbody id="logs"></tbody></table>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const db = getFirestore(initializeApp({ apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs", authDomain: "jsailing-f716c.firebaseapp.com", projectId: "jsailing-f716c", storageBucket: "jsailing-f716c.firebasestorage.app", appId: "1:543523103696:web:439a312efa6aec398a8fd5" }));
     
     let currentLogs = [];
+    let editId = null;
 
     onSnapshot(collection(db, "taksitulot"), (snap) => {
-        const now = new Date();
-        document.getElementById('statusHeader').innerText = `VERSIO 37.6 | PÄIVITETTY: ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}`;
+        document.getElementById('statusHeader').innerText = `VERSIO 38.0 | PÄIVITETTY: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
         currentLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        render();
+    });
+
+    function render() {
         const tbody = document.getElementById('logs');
         tbody.innerHTML = '';
         currentLogs.forEach(r => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td><b>${r.date||'-'}</b><br>${r.time||'-'}<br><span class="auto-tag">${r.auto||r.vehicle||'-'}</span></td>
-                            <td>${r.from||'-'} ⮕ ${r.to||'-'}</td><td>${r.price||'0'}€</td>`;
+            tr.innerHTML = `<td><b>${r.date||''}</b><br>${r.time||''}<br><b>${r.auto||''}</b></td>
+                            <td>${r.from||''} ⮕ ${r.to||''}</td>
+                            <td>${r.price||'0'}€<br>
+                            <button class="act-btn" onclick="prepareEdit('${r.id}')">✎</button>
+                            <button class="act-btn" onclick="deleteDoc(doc(db, 'taksitulot', '${r.id}'))">✖</button></td>`;
             tbody.appendChild(tr);
         });
-    });
+    }
+
+    window.parseMessage = () => {
+        const txt = document.getElementById('msgInput').value;
+        const autoMatch = txt.match(/SMB\s*\d+/i) || txt.match(/\b\d{3}\b/);
+        if (autoMatch) document.getElementById('inAuto').value = autoMatch[0].toUpperCase();
+        // ... (voit lisätä tähän loput parse-logiikan vastaavasti)
+    };
+
+    window.prepareEdit = (id) => {
+        const r = currentLogs.find(l => l.id === id);
+        editId = id;
+        document.getElementById('inPvm').value = r.date||"";
+        document.getElementById('inKlo').value = r.time||"";
+        document.getElementById('inAuto').value = r.auto||"";
+        document.getElementById('inFrom').value = r.from||"";
+        document.getElementById('inTo').value = r.to||"";
+        document.getElementById('inHinta').value = r.price||"";
+    };
 
     document.getElementById('btnSave').onclick = async () => {
-        await addDoc(collection(db, "taksitulot"), {
-            date: document.getElementById('inPvm').value,
-            time: document.getElementById('inKlo').value,
-            auto: document.getElementById('inAuto').value,
-            from: document.getElementById('inFrom').value,
-            to: document.getElementById('inTo').value,
-            customer: document.getElementById('inNimi').value,
-            price: document.getElementById('inHinta').value
-        });
-        alert("Tallennettu!");
+        const data = { date: document.getElementById('inPvm').value, time: document.getElementById('inKlo').value, auto: document.getElementById('inAuto').value, from: document.getElementById('inFrom').value, to: document.getElementById('inTo').value, price: document.getElementById('inHinta').value };
+        if (editId) { await updateDoc(doc(db, "taksitulot", editId), data); editId = null; }
+        else { await addDoc(collection(db, "taksitulot"), data); }
     };
 
     window.exportSpecification = () => {
-        let csv = "\uFEFFPvm;Klo;Auto;Matkustaja;Reitti;Hinta\n";
+        let csv = "\uFEFFPvm;Klo;Auto;Reitti;Hinta\n";
         currentLogs.forEach(r => {
-            const a = (r.auto || r.vehicle || "").trim();
+            const a = (r.auto || "").trim();
             if (a !== "" && !/^\d+$/.test(a)) {
-                csv += `${r.date||''};${r.time||''};${a};${r.customer||''};${r.from||''}-${r.to||''};${r.price||''}\n`;
+                csv += `${r.date||''};${r.time||''};${a};${r.from||''}-${r.to||''};${r.price||''}\n`;
             }
         });
         const link = document.createElement("a");
