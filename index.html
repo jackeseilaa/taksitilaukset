@@ -2,107 +2,48 @@
 <html lang="fi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kuljetuskirja V37.4</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+    <title>Kuljetuskirja V37.5</title>
     <style>
-        :root { --bg: #000; --surface: #111; --border: #333; --accent: #c8f050; --text: #fff; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 10px; }
-        .header-meta { color: #888; font-size: 10px; text-align: center; margin-bottom: 5px; }
-        h1 { font-family: 'Syne', sans-serif; font-size: 1.2rem; text-align: center; color: var(--accent); margin-bottom: 10px; }
-        textarea { width: 100%; background: var(--surface); border: 2px solid var(--border); color: var(--text); padding: 10px; margin-bottom: 10px; min-height: 80px; }
-        .manual-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-        .manual-fields input { background: #000; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 4px; }
-        .full-width { grid-column: span 2; }
-        .btn { width: 100%; padding: 15px; border-radius: 8px; border: none; cursor: pointer; font-weight: 900; margin-bottom: 10px; }
-        .btn-add { background: var(--accent); color: #000; }
-        .btn-spec { background: #0044ff; color: #fff; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        body { font-family: sans-serif; background: #000; color: #fff; padding: 20px; }
+        .auto-tag { background: #fff; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; }
         td { padding: 10px; border-bottom: 1px solid #333; }
-        .auto-tag { background: #fff; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: 900; }
     </style>
 </head>
 <body>
-
-    <div class="header-meta" id="statusHeader">VERSIO 37.4 | PÄIVITETTY: --:--</div>
-    <h1>KULJETUSKIRJA</h1>
-
-    <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..."></textarea>
-    
-    <div class="manual-fields">
-        <input type="text" id="inPvm" placeholder="Pvm">
-        <input type="text" id="inKlo" placeholder="Klo">
-        <input type="text" id="inAuto" class="full-width" placeholder="Auto">
-        <input type="text" id="inFrom" class="full-width" placeholder="Lähtö">
-        <input type="text" id="inTo" class="full-width" placeholder="Meno">
-        <input type="text" id="inNimi" placeholder="Matkustaja">
-        <input type="text" id="inHinta" placeholder="Hinta">
-        <input type="text" id="inLasku" class="full-width" placeholder="Laskutusasiakas">
-    </div>
-
-    <button class="btn btn-add" id="btnSave">TALLENNA TILAUS</button>
-    <button class="btn btn-spec" onclick="exportSpecification()">Lataa erittely (tekstitunnuksilla)</button>
-
-    <table id="logsTable">
-        <tbody id="logs"></tbody>
-    </table>
+    <div id="status">Haetaan tietoja...</div>
+    <div id="logs"></div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({ apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs", authDomain: "jsailing-f716c.firebaseapp.com", projectId: "jsailing-f716c", storageBucket: "jsailing-f716c.firebasestorage.app", appId: "1:543523103696:web:439a312efa6aec398a8fd5" }));
-    const auth = getAuth();
-    
-    let currentLogs = [];
+    // Alustetaan Firebase ILMAN kirjautumista
+    const db = getFirestore(initializeApp({ 
+        apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs", 
+        authDomain: "jsailing-f716c.firebaseapp.com", 
+        projectId: "jsailing-f716c", 
+        storageBucket: "jsailing-f716c.firebasestorage.app", 
+        appId: "1:543523103696:web:439a312efa6aec398a8fd5" 
+    }));
 
-    signInAnonymously(auth).then(() => {
-        onSnapshot(collection(db, "taksitulot"), (snap) => {
-            const now = new Date();
-            document.getElementById('statusHeader').innerText = `VERSIO 37.4 | PÄIVITETTY: ${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}`;
-            
-            currentLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            const tbody = document.getElementById('logs');
-            tbody.innerHTML = '';
-            currentLogs.forEach(r => {
-                const auto = (r.vehicle || r.auto || "-");
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td><b>${r.date||'-'}</b><br>${r.time||'-'}<br><span class="auto-tag">${auto}</span></td>
-                                <td>${r.from||'-'} ⮕ ${r.to||'-'}</td>
-                                <td>${r.price||'0'}€</td>`;
-                tbody.appendChild(tr);
-            });
+    // Haetaan data suoraan, ei kirjautumisia
+    onSnapshot(collection(db, "taksitulot"), (snap) => {
+        document.getElementById('status').innerText = "Data haettu onnistuneesti!";
+        let html = '<table>';
+        snap.forEach(doc => {
+            const r = doc.data();
+            html += `<tr>
+                <td>${r.date || ''}</td>
+                <td>${r.from || ''} ⮕ ${r.to || ''}</td>
+                <td><span class="auto-tag">${r.auto || r.vehicle || '-'}</span></td>
+            </tr>`;
         });
+        document.getElementById('logs').innerHTML = html + '</table>';
+    }, (err) => {
+        document.getElementById('status').innerText = "Virhe: " + err.message;
+        console.error(err);
     });
-
-    document.getElementById('btnSave').onclick = async () => {
-        await addDoc(collection(db, "taksitulot"), {
-            date: document.getElementById('inPvm').value,
-            time: document.getElementById('inKlo').value,
-            auto: document.getElementById('inAuto').value,
-            from: document.getElementById('inFrom').value,
-            to: document.getElementById('inTo').value,
-            customer: document.getElementById('inNimi').value,
-            price: document.getElementById('inHinta').value,
-            billing: document.getElementById('inLasku').value
-        });
-        alert("Tallennettu!");
-    };
-
-    window.exportSpecification = () => {
-        let csv = "\uFEFFPvm;Klo;Auto;Matkustaja;Reitti;Hinta\n";
-        currentLogs.forEach(r => {
-            const auto = (r.vehicle || r.auto || "").trim();
-            if (auto !== "" && !/^\d+$/.test(auto)) {
-                csv += `${r.date||''};${r.time||''};${auto};${r.customer||''};${r.from||''}-${r.to||''};${r.price||''}\n`;
-            }
-        });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        link.download = "erittely.csv";
-        link.click();
-    };
 </script>
 </body>
 </html>
