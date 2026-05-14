@@ -1,47 +1,21 @@
-<!DOCTYPE html>
-<html lang="fi">
-<head>
-    <meta charset="UTF-8">
-    <title>Kuljetuskirja V37.0</title>
-    <style>
-        :root { --bg: #000; --accent: #c8f050; --text: #fff; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
-        .btn-spec { background: #0044ff; color: white; padding: 15px; border-radius: 8px; border: none; cursor: pointer; font-weight: 900; }
-    </style>
-</head>
-<body>
-    <h1>KULJETUSKIRJA V37.0</h1>
-    <button class="btn-spec" onclick="exportSpecification()">Lataa vain tekstitunnukselliset (VEHO, SMB, jne.)</button>
+<div class="v-tag" id="statusHeader">VERSIO 37.1 | PÄIVITETTY: --:--</div>
+<h1>KULJETUSKIRJA</h1>
 
 <script type="module">
-    // ... (Firebase-alustus pysyy samana)
+    // ... (muut importit)
 
-    window.exportSpecification = () => {
-        let csv = "\uFEFFPvm;Klo;Auto;Matkustaja;Reitti;Hinta;Huomio\n";
-        
-        currentLogs.forEach(r => {
-            const vehicle = (r.vehicle || r.auto || "").trim();
-            
-            // SUODATIN: 
-            // 1. Jos vehicle on tyhjä, skippaa.
-            // 2. Jos vehicle sisältää VAIN numeroita, skippaa.
-            const isPureNumber = /^\d+$/.test(vehicle);
-            
-            if (vehicle !== "" && !isPureNumber) {
-                const reitti = `${r.from || ''} - ${r.to || ''}`;
-                const huom = `${r.notes || ''}`.trim();
-                csv += `${r.date || ''};${r.time || ''};${vehicle};${r.customer || ''};${reitti};${r.price || ''};${huom}\n`;
-            }
+    function startListening() {
+        onSnapshot(query(collection(db, "taksitulot")), (snap) => {
+            // Päivitetään status-kello kun dataa tulee
+            const now = new Date();
+            const timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
+                            now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('statusHeader').innerText = `VERSIO 37.1 | PÄIVITETTY: ${timeStr}`;
+
+            const tbody = document.getElementById('logs');
+            tbody.innerHTML = '';
+            // ... (muu logiikka ennallaan)
         });
-        
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "erittely_tekstitunnuksilla.csv";
-        link.click();
-    };
-    
-    // ... (loppuosa ennallaan)
+    }
+    // ...
 </script>
-</body>
-</html>
