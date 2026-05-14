@@ -2,49 +2,92 @@
 <html lang="fi">
 <head>
     <meta charset="UTF-8">
-    <title>Kuljetuskirja V39.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kuljetuskirja V39.1</title>
     <style>
-        :root { --bg: #000; --accent: #c8f050; --text: #fff; }
+        :root { --bg: #000; --accent: #c8f050; --text: #fff; --surface: #111; }
         body { font-family: sans-serif; background: var(--bg); color: var(--text); padding: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        td { padding: 8px; border-bottom: 1px solid #333; font-size: 0.9rem; }
+        .header-meta { color: #888; font-size: 10px; text-align: center; margin-bottom: 5px; }
+        textarea { width: 100%; background: var(--surface); border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 10px; height: 60px; }
+        .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+        input { background: #111; border: 1px solid #333; color: #fff; padding: 8px; }
+        .full { grid-column: span 2; }
+        .btn { width: 100%; padding: 12px; margin-top: 5px; border: none; font-weight: bold; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        td { padding: 8px; border-bottom: 1px solid #333; }
+        .act-btn { cursor: pointer; background: #222; border: 1px solid #444; color: #50c8f0; margin-left: 5px; }
         .is-dup { background: #4a0000; } /* Duplikaattien väri */
-        .btn { width: 48%; padding: 10px; border: none; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="statusHeader">V39.0</div>
-    <div style="display:flex; justify-content:space-between;">
-        <button class="btn" onclick="exportCSV(false)">Lataa erittely</button>
-        <button class="btn" style="background:#555" onclick="exportCSV(true)">Lataa KAIKKI</button>
+    <div class="header-meta" id="statusHeader">VERSIO 39.1 | PÄIVITETTY: --:--</div>
+    <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..."></textarea>
+    <div class="fields">
+        <input id="inPvm" placeholder="Pvm"> <input id="inKlo" placeholder="Klo">
+        <input id="inAuto" class="full" placeholder="Auto">
+        <input id="inFrom" class="full" placeholder="Lähtö">
+        <input id="inTo" class="full" placeholder="Meno">
+        <input id="inNimi" placeholder="Matkustaja"> <input id="inHinta" placeholder="Hinta">
+    </div>
+    <button class="btn" style="background:var(--accent)" id="btnSave">TALLENNA TILAUS</button>
+    <div style="display:flex; gap:10px;">
+        <button class="btn" style="background:#0044ff; color:#fff" onclick="exportCSV(false)">Lataa erittely (CSV)</button>
+        <button class="btn" style="background:#555; color:#fff" onclick="exportCSV(true)">Lataa KAIKKI (CSV)</button>
     </div>
     <table id="logsTable"><tbody id="logs"></tbody></table>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const db = getFirestore(initializeApp({ apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs", authDomain: "jsailing-f716c.firebaseapp.com", projectId: "jsailing-f716c", storageBucket: "jsailing-f716c.firebasestorage.app", appId: "1:543523103696:web:439a312efa6aec398a8fd5" }));
     
     let currentLogs = [];
+    let editId = null;
 
     onSnapshot(collection(db, "taksitulot"), (snap) => {
+        document.getElementById('statusHeader').innerText = `VERSIO 39.1 | PÄIVITETTY: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
         let raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        // Tunnistetaan duplikaatit vertaamalla kenttiä
+        
         currentLogs = raw.map((item, index, self) => {
             const isDup = self.findIndex(i => i.date === item.date && i.time === item.time && i.from === item.from && i.to === item.to) !== index;
             return { ...item, isDup };
         });
-        
+        render();
+    });
+
+    function render() {
         const tbody = document.getElementById('logs');
         tbody.innerHTML = '';
         currentLogs.forEach(r => {
             const tr = document.createElement('tr');
             if (r.isDup) tr.className = 'is-dup';
-            tr.innerHTML = `<td>${r.date} ${r.time}</td><td>${r.from} ⮕ ${r.to}</td><td>${r.auto||''}</td>`;
+            tr.innerHTML = `<td><b>${r.date||''}</b><br>${r.time||''}<br><b>${r.auto||''}</b></td>
+                            <td>${r.from||''} ⮕ ${r.to||''}</td>
+                            <td>${r.price||'0'}€<br>
+                            <button class="act-btn" onclick="prepareEdit('${r.id}')">✎</button>
+                            <button class="act-btn" onclick="deleteDoc(doc(db, 'taksitulot', '${r.id}'))">✖</button></td>`;
             tbody.appendChild(tr);
         });
-    });
+    }
+
+    window.prepareEdit = (id) => {
+        const r = currentLogs.find(l => l.id === id);
+        editId = id;
+        document.getElementById('inPvm').value = r.date||"";
+        document.getElementById('inKlo').value = r.time||"";
+        document.getElementById('inAuto').value = r.auto||"";
+        document.getElementById('inFrom').value = r.from||"";
+        document.getElementById('inTo').value = r.to||"";
+        document.getElementById('inNimi').value = r.customer||"";
+        document.getElementById('inHinta').value = r.price||"";
+    };
+
+    document.getElementById('btnSave').onclick = async () => {
+        const data = { date: document.getElementById('inPvm').value, time: document.getElementById('inKlo').value, auto: document.getElementById('inAuto').value, from: document.getElementById('inFrom').value, to: document.getElementById('inTo').value, customer: document.getElementById('inNimi').value, price: document.getElementById('inHinta').value };
+        if (editId) { await updateDoc(doc(db, "taksitulot", editId), data); editId = null; }
+        else { await addDoc(collection(db, "taksitulot"), data); }
+    };
 
     window.exportCSV = (all) => {
         let csv = "\uFEFFPvm;Klo;Auto;Matkustaja;Reitti;Hinta\n";
