@@ -84,7 +84,7 @@ pointer; color: var(--accent2); padding: 6px 10px; border-radius: 4px; margin-ri
  </style>
 </head>
 <body>
-<div class="v-tag">VERSIO 37.22 (Geminin korjaukset: Lajittelu, Auto-tunnistus parseMessage, oletusarvot)</div>
+<div class="v-tag">VERSIO 37.23 (Joustavampi parseMessage: huomenna, pp.kk, hh.mm, XXe, Lähtö/Meno)</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()">
@@ -386,11 +386,13 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  };
  
  /* ===== PARSEAAVIESTI SUOMALAISESTA TAKSIVARAUKSESTA =====
-  * GEMININ KORJAUS: Lisätty Auto-tunnistus!
-  * UUDET TUNNISTIMET:
-  *   - "auto: 123" tai "auto:123"
-  *   - "nro: ABC" tai "nro:ABC"
-  *   - "A123" (3-4 merkkinen koodi)
+  * V37.22 PARANNETTU: Joustavampi regex, tunnistaa suomalaisia vaihteluja
+  * KORJAUKSET:
+  *   - Päivämäärä: "huomenna", "tänään", "pp.k", "pp.kk", "pp.kk.yyyy"
+  *   - Aika: "hh.mm" JA "hh:mm" (sekä pisteet että kaksoispisteet)
+  *   - Hinta: "XXe", "XX€", "XX,XX€" (eri muodot)
+  *   - Reitti: "Lähtö", "Meno", "mistä", "From" (eri termit)
+  *   - Laskutus: "Maksu autoon", "Lasku", "Maksaja" (eri muodot)
   */
  window.parseMessage = () => {
  const msg = document.getElementById('msgInput').value.trim();
@@ -400,62 +402,106 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  const todayStr = String(today.getDate()).padStart(2,'0') + '.' + 
 String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  
- // ===== PÄIVÄMÄÄRÄ =====
+ // ===== PÄIVÄMÄÄRÄ (Joustavampi) =====
  let date = '';
  const msgLower = msg.toLowerCase();
+ 
  if (msgLower.includes('tänään')) {
  date = todayStr;
  } else if (msgLower.includes('huomenna')) {
+ // Huomenna - lisää yksi päivä
  const tomorrow = new Date(today);
  tomorrow.setDate(tomorrow.getDate() + 1);
  date = String(tomorrow.getDate()).padStart(2,'0') + '.' + 
 String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  } else {
- const dateMatch = msg.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/);
- if (dateMatch) date = dateMatch[0];
+ // Yritä löytää pp.kk.yyyy muoto
+ let dateMatch = msg.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/);
+ if (dateMatch) {
+ date = dateMatch[0];
+ } else {
+ // Jos ei pp.kk.yyyy, yritä pp.kk (lisää kuluva vuosi)
+ dateMatch = msg.match(/\b(\d{1,2})\.(\d{1,2})\b/);
+ if (dateMatch) {
+ const day = dateMatch[1];
+ const month = dateMatch[2];
+ const year = today.getFullYear();
+ date = String(day).padStart(2,'0') + '.' + String(month).padStart(2,'0') + '.' + year;
+ }
+ }
  }
  
- // ===== AIKA =====
- const timeMatch = msg.match(/\b(\d{1,2}):(\d{2})\b/);
- const time = timeMatch ? timeMatch[0] : '';
+ // ===== AIKA (Joustavampi - hyväksy sekä : että .) =====
+ // Etsii muotoja: "09:30", "09.30", "9:30", "9.30"
+ let time = '';
+ const timeMatch = msg.match(/\b(\d{1,2})[:.](\d{2})\b/);
+ if (timeMatch) {
+ time = timeMatch[1].padStart(2,'0') + ':' + timeMatch[2]; // Normalisoi muotoon "hh:mm"
+ }
  
- // ===== HINTA =====
- const priceMatch = msg.match(/([\d,]+)\s*€/);
- const price = priceMatch ? priceMatch[1].replace(',', '.') : '';
+ // ===== HINTA (Joustavampi - hyväksy €, e, eur) =====
+ // Etsii muotoja: "58e", "58€", "58,50€", "45e vip"
+ let price = '';
+ const priceMatch = msg.match(/([\d,]+)\s*(?:€|e(?:\s|$|[^a-z]))/i);
+ if (priceMatch) {
+ price = priceMatch[1].replace(',', '.'); // Normalisoi pilkun pisteeksi
+ }
  
- // ===== REITTI =====
+ // ===== REITTI (Joustavampi - tunnista suomalaiset termit) =====
  let from = '', to = '';
- const routeMatch = msg.match(/mistä[:\s]+([^\n]*?)(?=mihin|->|$)/i);
- const toMatch = msg.match(/(?:mihin|->)[:\s]*([^\n]*?)(?=\n|€|lasku|$)/i);
- if (routeMatch) from = routeMatch[1].trim();
- if (toMatch) to = toMatch[1].trim();
  
- // ===== PUHELIN =====
+ // Etsii "Lähtö", "Meno", "From", "mistä" → seuraavaksi riviin saakka
+ const fromMatch = msg.match(/(?:lähtö|from|mistä|lähto|meno)[:\s]*\n?([^\n]+)/i);
+ if (fromMatch) {
+ from = fromMatch[1].trim();
+ }
+ 
+ // Etsii "Meno", "To", "mihin" → seuraavaksi riviin saakka
+ const toMatch = msg.match(/(?:meno|to|mihin|kohde)[:\s]*\n?([^\n]+)/i);
+ if (toMatch) {
+ to = toMatch[1].trim();
+ }
+ 
+ // ===== MATKUSTAJA (Etsii nimiä) =====
+ // Yritä löytää rivi jossa on "Kyytiin" tai "Kuka"
+ let customer = '';
+ const customerMatch = msg.match(/(?:kyytiin|kuka|kyydissä|matkustaja)[:\s]*\n?([^\n]+)/i);
+ if (customerMatch) {
+ customer = customerMatch[1].trim();
+ }
+ 
+ // ===== PUHELIN (9+ numeroa) =====
  const phoneMatch = msg.match(/\b(\d{9,})\b/);
  const phone = phoneMatch ? phoneMatch[1] : '';
  
- // ===== LASKUTUSOSAPUOLI =====
- const billingMatch = msg.match(/(?:lasku|laskutus|maksaja)[:\s]*([^\n]*?)(?=\n|€|$)/i);
- const billing = billingMatch ? billingMatch[1].trim() : '';
+ // ===== LASKUTUSOSAPUOLI (Joustavampi) =====
+ // Etsii "Maksu autoon", "Lasku", "Maksaja", "Laskutus"
+ let billing = '';
+ const billingMatch = msg.match(/(?:maksu\s+autoon|lasku|maksaja|laskutus|billable)[:\s]*\n?([^\n]*)/i);
+ if (billingMatch && billingMatch[1]) {
+ billing = billingMatch[1].trim();
+ } else if (msgLower.includes('maksu autoon')) {
+ billing = 'Maksu autoon';
+ }
  
- // ===== AUTO - UUSI TUNNISTUS (GEMININ KORJAUS) =====
- // Etsii muotoja: "auto: 123", "nro: ABC", tai "A123" tyyppisiä koodeja
+ // ===== AUTO (Tunnistus) =====
  let car = '';
- const autoMatch = msg.match(/(?:auto|nro)[:\s]*(\w+)/i);
+ const autoMatch = msg.match(/(?:auto|nro|ajoneuvo)[:\s]*(\w+)/i);
  if (autoMatch) {
  car = autoMatch[1].trim();
  } else {
- // Jos "auto:" ei löydy, etsii 3-4 merkkistä koodia (esim. "SMB", "A123")
+ // Jos "auto:" ei löydy, etsii 3-4 merkkistä koodia
  const codeMatch = msg.match(/\b([A-Z0-9]{3,4})\b/);
  if (codeMatch) car = codeMatch[1];
  }
  
- // ===== ASETA KENTÄT =====
+ // ===== ASETA KENTÄT (vain jos löydetty) =====
  if (date) document.getElementById('inPvm').value = date;
  if (time) document.getElementById('inKlo').value = time;
  if (price) document.getElementById('inHinta').value = price;
  if (from) document.getElementById('inFrom').value = from;
  if (to) document.getElementById('inTo').value = to;
+ if (customer) document.getElementById('inNimi').value = customer;
  if (phone) document.getElementById('inPuhelin').value = phone;
  if (billing) document.getElementById('inLasku').value = billing;
  if (car) document.getElementById('inAuto').value = car;
