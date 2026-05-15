@@ -4,7 +4,7 @@
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, 
 user-scalable=no">
- <title>Kuljetuskirja V37.31</title>
+ <title>Kuljetuskirja V37.22</title>
  <link href="https://fonts.googleapis.com/css2?
 family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
@@ -84,7 +84,7 @@ pointer; color: var(--accent2); padding: 6px 10px; border-radius: 4px; margin-ri
  </style>
 </head>
 <body>
-<div class="v-tag">VERSIO 37.31 (DEBUG - Avaa Console F12 ja katso viestit) (PRODUCTION READY - Maksu autoon tunnistus lisätty) (FINAL - Korjattu msgLower duplikaatti) (FINAL - Päivämäärä ensiöity, Lasku regex fix, Väri-logiikka, Hinnan kontrasti) (Geminin hyväksymä - puhdistettu / ja välilyönnit) (Monirivinen parseMessage: Nimi/Tilaaja/Lasku erottelu, pp.kk täydennys, Huomio)</div>
+<div class="v-tag">VERSIO 37.32 (FIXED - today lasketaan renderTable:ssa) (DEBUG - Avaa Console F12 ja katso viestit) (PRODUCTION READY - Maksu autoon tunnistus lisätty) (FINAL - Korjattu msgLower duplikaatti) (FINAL - Päivämäärä ensiöity, Lasku regex fix, Väri-logiikka, Hinnan kontrasti) (Geminin hyväksymä - puhdistettu / ja välilyönnit) (Monirivinen parseMessage: Nimi/Tilaaja/Lasku erottelu, pp.kk täydennys, Huomio)</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()">
@@ -213,6 +213,7 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
   */
  function renderTable() {
  console.log("🎨 renderTable() kutsuttu, currentLogs.length =", currentLogs.length);
+ const today = new Date();  // ← LASKE TÄSSÄ!
  const tbody = document.getElementById('logs');
  tbody.innerHTML = '';
  
