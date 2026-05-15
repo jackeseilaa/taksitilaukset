@@ -84,7 +84,7 @@ pointer; color: var(--accent2); padding: 6px 10px; border-radius: 4px; margin-ri
  </style>
 </head>
 <body>
-<div class="v-tag">VERSIO 37.25 (Monirivinen parseMessage: Nimi/Tilaaja/Lasku erottelu, pp.kk täydennys, Huomio)</div>
+<div class="v-tag">VERSIO 37.26 (Monirivinen parseMessage: Nimi/Tilaaja/Lasku erottelu, pp.kk täydennys, Huomio)</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()">
@@ -476,41 +476,29 @@ String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  }
  }
  
- // ===== MATKUSTAJA - PARANNETTU (ota saman rivin loppuosa!) =====
+ // ===== MATKUSTAJA - PARANNETTU (salli "/" ja välilyönnit!) =====
  let customer = '';
  
- // Etsii "Nimi:" osion
+ // Etsii "Nimi:" tai "Kyytiin" osion - salli "/" ja välilyönnit alussa!
  for (let i = 0; i < lines.length; i++) {
- const match = lines[i].match(/^nimi[:\s]*(.*)$/i);
+ const trimmedLine = lines[i].trim();
+ // [\s\/]* = sallii välilyönnit ja "/" merkit alussa
+ const match = trimmedLine.match(/^[\s\/]*(nimi|kyytiin|kuka|kyydissä|matkustaja)[:\s]*(.*)$/i);
  if (match) {
- // Jos saman rivin jälkeinen teksti ei ole tyhjä, käytä sitä
- if (match[1] && match[1].trim()) {
- customer = match[1].trim();
- } else if (i + 1 < lines.length) {
- // Muuten seuraava rivi on nimi
- const name = lines[i + 1].trim();
- if (name && !name.match(/^\+|^[0-9]/)) {
- customer = name;
- }
- }
- break;
- }
- }
- 
- // Fallback: jos "Nimi:" ei löytynyt, yritä "Kyytiin" / "Kuka"
- if (!customer) {
- for (let i = 0; i < lines.length; i++) {
- const match = lines[i].match(/^(kyytiin|kuka|kyydissä|matkustaja|passenger)[:\s]*(.*)$/i);
- if (match) {
+ // match[2] on saman rivin loppuosa
  if (match[2] && match[2].trim()) {
- customer = match[2].trim();
- } else if (i + 1 < lines.length) {
- const name = lines[i + 1].trim();
- if (name && !name.match(/^\+|^[0-9]/)) {
+ const name = match[2].trim();
+ if (!name.match(/^\+|^[0-9]/)) {
  customer = name;
- }
- }
  break;
+ }
+ } else if (i + 1 < lines.length) {
+ // Seuraava rivi on nimi
+ const name = lines[i + 1].trim();
+ if (name && !name.match(/^\+|^[0-9]/) && !name.match(/^[\s\/]*(tilaaja|lasku)/i)) {
+ customer = name;
+ break;
+ }
  }
  }
  }
@@ -519,22 +507,23 @@ String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  const phoneMatch = msg.match(/(\+?\d{8,})/);  // 8+ numeroa, sallii + alkuun
  const phone = phoneMatch ? phoneMatch[1] : '';
  
- // ===== TILAAJA - PARANNETTU (ota saman rivin loppuosa!) =====
+ // ===== TILAAJA - PARANNETTU (salli "/" ja välilyönnit!) =====
  let billing = '';
  
- // Etsii "Tilaaja" osion (OMA osio, ei lasku!)
+ // Etsii "Tilaaja" osion - salli "/" ja välilyönnit alussa!
  for (let i = 0; i < lines.length; i++) {
- const match = lines[i].match(/^tilaaja[:\s]*(.*)$/i);
+ const trimmedLine = lines[i].trim();
+ const match = trimmedLine.match(/^[\s\/]*(tilaaja)[:\s]*(.*)$/i);
  if (match) {
  let billingLines = [];
- // Lisää saman rivin loppuosa jos se on tyhjä
- if (match[1] && match[1].trim()) {
- billingLines.push(match[1].trim());
+ // Lisää saman rivin loppuosa
+ if (match[2] && match[2].trim()) {
+ billingLines.push(match[2].trim());
  }
- // Kerää seuraavat rivit
+ // Kerää seuraavat rivit kunnes "Lasku" / "Laskulle" / "Huomio" / "Ok"
  for (let j = i + 1; j < lines.length && j < i + 3; j++) {
  const line = lines[j].trim();
- if (!line || line.match(/^(lasku|huomio|kuuluu|ok)/i)) break;
+ if (!line || line.match(/^[\s\/]*(lasku|laskulle|huomio|kuuluu|ok)/i)) break;
  if (line) billingLines.push(line);
  }
  if (billingLines.length > 0) {
@@ -544,22 +533,23 @@ String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  }
  }
  
- // ===== LASKU / MAKSAJA - Ota saman rivin loppuosa! =====
+ // ===== LASKU / MAKSAJA - Parannettu (tunne "laskulle", salli "/" ja välilyönnit!) =====
  let invoiceParty = '';
  
- // Etsii "Lasku" osion
+ // Etsii "Lasku" tai "Laskulle" osion - salli "/" ja välilyönnit alussa!
  for (let i = 0; i < lines.length; i++) {
- const match = lines[i].match(/^lasku[:\s]*(.*)$/i);
+ const trimmedLine = lines[i].trim();
+ const match = trimmedLine.match(/^[\s\/]*(lasku|laskulle)[:\s\/]*(.*)$/i);
  if (match) {
  let invoiceLines = [];
  // Lisää saman rivin loppuosa
- if (match[1] && match[1].trim()) {
- invoiceLines.push(match[1].trim());
+ if (match[2] && match[2].trim()) {
+ invoiceLines.push(match[2].trim());
  }
- // Kerää seuraavat rivit
+ // Kerää seuraavat rivit kunnes "Huomio" / "Kuuluu" / "Ok"
  for (let j = i + 1; j < lines.length && j < i + 3; j++) {
  const line = lines[j].trim();
- if (!line || line.match(/^(huomio|kuuluu|ok)/i)) break;
+ if (!line || line.match(/^[\s\/]*(huomio|kuuluu|ok)/i)) break;
  if (line) invoiceLines.push(line);
  }
  if (invoiceLines.length > 0) {
