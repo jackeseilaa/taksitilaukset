@@ -84,7 +84,7 @@ pointer; color: var(--accent2); padding: 6px 10px; border-radius: 4px; margin-ri
  </style>
 </head>
 <body>
-<div class="v-tag">VERSIO 37.23 (Joustavampi parseMessage: huomenna, pp.kk, hh.mm, XXe, Lähtö/Meno)</div>
+<div class="v-tag">VERSIO 37.24 (Monirivinen parseMessage: Nimi/Tilaaja/Lasku erottelu, pp.kk täydennys, Huomio)</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()">
@@ -385,14 +385,13 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  });
  };
  
- /* ===== PARSEAAVIESTI SUOMALAISESTA TAKSIVARAUKSESTA =====
-  * V37.22 PARANNETTU: Joustavampi regex, tunnistaa suomalaisia vaihteluja
+ /* ===== PARSEAAVIESTI - V37.23 PARANNETTU =====
   * KORJAUKSET:
-  *   - Päivämäärä: "huomenna", "tänään", "pp.k", "pp.kk", "pp.kk.yyyy"
-  *   - Aika: "hh.mm" JA "hh:mm" (sekä pisteet että kaksoispisteet)
-  *   - Hinta: "XXe", "XX€", "XX,XX€" (eri muodot)
-  *   - Reitti: "Lähtö", "Meno", "mistä", "From" (eri termit)
-  *   - Laskutus: "Maksu autoon", "Lasku", "Maksaja" (eri muodot)
+  *   - "Nimi:" tunnistus matkustajalle
+  *   - "Tilaaja" ja "Lasku" oikea erottelu
+  *   - "Huomio" / "Huomautus" tunnistamattomuus
+  *   - Monirivinen käsittely (2+ rivejä kentille)
+  *   - Päivämäärä "pp.kk" → oikea vuosi
   */
  window.parseMessage = () => {
  const msg = document.getElementById('msgInput').value.trim();
@@ -402,100 +401,186 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  const todayStr = String(today.getDate()).padStart(2,'0') + '.' + 
 String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  
- // ===== PÄIVÄMÄÄRÄ (Joustavampi) =====
- let date = '';
+ // Split viestin riveihin käsittelyä varten
+ const lines = msg.split('\n');
  const msgLower = msg.toLowerCase();
  
+ // ===== PÄIVÄMÄÄRÄ =====
+ let date = '';
  if (msgLower.includes('tänään')) {
  date = todayStr;
  } else if (msgLower.includes('huomenna')) {
- // Huomenna - lisää yksi päivä
  const tomorrow = new Date(today);
  tomorrow.setDate(tomorrow.getDate() + 1);
  date = String(tomorrow.getDate()).padStart(2,'0') + '.' + 
 String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  } else {
- // Yritä löytää pp.kk.yyyy muoto
+ // pp.kk.yyyy
  let dateMatch = msg.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/);
  if (dateMatch) {
  date = dateMatch[0];
  } else {
- // Jos ei pp.kk.yyyy, yritä pp.kk (lisää kuluva vuosi)
+ // pp.kk (lisää kuluva vuosi - KORJAUS!)
  dateMatch = msg.match(/\b(\d{1,2})\.(\d{1,2})\b/);
  if (dateMatch) {
- const day = dateMatch[1];
- const month = dateMatch[2];
+ const day = String(dateMatch[1]).padStart(2,'0');
+ const month = String(dateMatch[2]).padStart(2,'0');
  const year = today.getFullYear();
- date = String(day).padStart(2,'0') + '.' + String(month).padStart(2,'0') + '.' + year;
+ date = `${day}.${month}.${year}`;
  }
  }
  }
  
- // ===== AIKA (Joustavampi - hyväksy sekä : että .) =====
- // Etsii muotoja: "09:30", "09.30", "9:30", "9.30"
+ // ===== AIKA =====
  let time = '';
  const timeMatch = msg.match(/\b(\d{1,2})[:.](\d{2})\b/);
  if (timeMatch) {
- time = timeMatch[1].padStart(2,'0') + ':' + timeMatch[2]; // Normalisoi muotoon "hh:mm"
+ time = timeMatch[1].padStart(2,'0') + ':' + timeMatch[2];
  }
  
- // ===== HINTA (Joustavampi - hyväksy €, e, eur) =====
- // Etsii muotoja: "58e", "58€", "58,50€", "45e vip"
+ // ===== HINTA =====
  let price = '';
  const priceMatch = msg.match(/([\d,]+)\s*(?:€|e(?:\s|$|[^a-z]))/i);
  if (priceMatch) {
- price = priceMatch[1].replace(',', '.'); // Normalisoi pilkun pisteeksi
+ price = priceMatch[1].replace(',', '.');
  }
  
- // ===== REITTI (Joustavampi - tunnista suomalaiset termit) =====
+ // ===== REITTI - PARANNETTU (2+ rivejä) =====
  let from = '', to = '';
  
- // Etsii "Lähtö", "Meno", "From", "mistä" → seuraavaksi riviin saakka
- const fromMatch = msg.match(/(?:lähtö|from|mistä|lähto|meno)[:\s]*\n?([^\n]+)/i);
- if (fromMatch) {
- from = fromMatch[1].trim();
+ // Etsii "Lähtö" / "Meno" rivin jälkeen seuraavaksi 1-2 riviksi
+ for (let i = 0; i < lines.length; i++) {
+ if (lines[i].match(/^(lähtö|from|mistä|lähto|origin)/i)) {
+ // Yhdistä seuraavat rivit kunnes löydät tyhjän rivin tai seuraavan osion
+ let fromLines = [];
+ for (let j = i + 1; j < lines.length && j < i + 3; j++) {
+ const line = lines[j].trim();
+ if (!line || line.match(/^(meno|to|mihin|tilaaja|nimi|kyytiin|hinta|lasku|huomio|ok)/i)) break;
+ if (line) fromLines.push(line);
+ }
+ from = fromLines.join(' ').trim();
+ break;
+ }
  }
  
- // Etsii "Meno", "To", "mihin" → seuraavaksi riviin saakka
- const toMatch = msg.match(/(?:meno|to|mihin|kohde)[:\s]*\n?([^\n]+)/i);
- if (toMatch) {
- to = toMatch[1].trim();
+ for (let i = 0; i < lines.length; i++) {
+ if (lines[i].match(/^(meno|to|mihin|kohde|destination)/i)) {
+ let toLines = [];
+ for (let j = i + 1; j < lines.length && j < i + 3; j++) {
+ const line = lines[j].trim();
+ if (!line || line.match(/^(nimi|kyytiin|hinta|tilaaja|lasku|huomio|ok)/i)) break;
+ if (line) toLines.push(line);
+ }
+ to = toLines.join(' ').trim();
+ break;
+ }
  }
  
- // ===== MATKUSTAJA (Etsii nimiä) =====
- // Yritä löytää rivi jossa on "Kyytiin" tai "Kuka"
+ // ===== MATKUSTAJA - PARANNETTU (tunnista "Nimi:") =====
  let customer = '';
- const customerMatch = msg.match(/(?:kyytiin|kuka|kyydissä|matkustaja)[:\s]*\n?([^\n]+)/i);
- if (customerMatch) {
- customer = customerMatch[1].trim();
+ 
+ // Etsii "Nimi:" osion
+ for (let i = 0; i < lines.length; i++) {
+ if (lines[i].match(/^nimi[:\s]*/i)) {
+ // Seuraava rivi on nimi (jos ei ole tyhjä)
+ if (i + 1 < lines.length) {
+ const name = lines[i + 1].trim();
+ if (name && !name.match(/^\+|^[0-9]/)) {  // Jos rivi ei ala numerolla/puhelimella
+ customer = name;
+ break;
+ }
+ }
+ }
  }
  
- // ===== PUHELIN (9+ numeroa) =====
- const phoneMatch = msg.match(/\b(\d{9,})\b/);
+ // Fallback: jos "Nimi:" ei löytynyt, yritä "Kyytiin" / "Kuka"
+ if (!customer) {
+ for (let i = 0; i < lines.length; i++) {
+ if (lines[i].match(/^(kyytiin|kuka|kyydissä|matkustaja|passenger)/i)) {
+ if (i + 1 < lines.length) {
+ const name = lines[i + 1].trim();
+ if (name && !name.match(/^\+|^[0-9]/)) {
+ customer = name;
+ break;
+ }
+ }
+ }
+ }
+ }
+ 
+ // ===== PUHELIN =====
+ const phoneMatch = msg.match(/(\+?\d{8,})/);  // 8+ numeroa, sallii + alkuun
  const phone = phoneMatch ? phoneMatch[1] : '';
  
- // ===== LASKUTUSOSAPUOLI (Joustavampi) =====
- // Etsii "Maksu autoon", "Lasku", "Maksaja", "Laskutus"
+ // ===== TILAAJA - PARANNETTU (erottelu Laskusta) =====
  let billing = '';
- const billingMatch = msg.match(/(?:maksu\s+autoon|lasku|maksaja|laskutus|billable)[:\s]*\n?([^\n]*)/i);
- if (billingMatch && billingMatch[1]) {
- billing = billingMatch[1].trim();
- } else if (msgLower.includes('maksu autoon')) {
- billing = 'Maksu autoon';
+ 
+ // Etsii "Tilaaja" osion (OMA osio, ei lasku!)
+ for (let i = 0; i < lines.length; i++) {
+ if (lines[i].match(/^tilaaja[:\s]*/i)) {
+ let billingLines = [];
+ for (let j = i + 1; j < lines.length && j < i + 3; j++) {
+ const line = lines[j].trim();
+ // Lopeta jos tulee seuraava suurempi osio (lasku, huomio, ok)
+ if (!line || line.match(/^(lasku|huomio|kuuluu|ok|maksu)/i)) break;
+ if (line) billingLines.push(line);
+ }
+ if (billingLines.length > 0) {
+ billing = billingLines.join(' ').trim();
+ break;
+ }
+ }
  }
  
- // ===== AUTO (Tunnistus) =====
+ // ===== LASKU / MAKSAJA - Pitää erottaa TILAAJASTA =====
+ let invoiceParty = '';
+ 
+ // Etsii "Lasku" osion
+ for (let i = 0; i < lines.length; i++) {
+ if (lines[i].match(/^lasku[:\s]*/i)) {
+ let invoiceLines = [];
+ for (let j = i + 1; j < lines.length && j < i + 3; j++) {
+ const line = lines[j].trim();
+ if (!line || line.match(/^(huomio|kuuluu|ok)/i)) break;
+ if (line) invoiceLines.push(line);
+ }
+ if (invoiceLines.length > 0) {
+ invoiceParty = invoiceLines.join(' ').trim();
+ } else {
+ invoiceParty = billing;  // Jos lasku on tyhjä, käytä tilaajaa
+ }
+ break;
+ }
+ }
+ 
+ // ===== HUOMIO / NOTES - PARANNETTU =====
+ let notes = '';
+ 
+ // Etsii "Huomio" / "Huomautus" / "Kuuluu" osion
+ for (let i = 0; i < lines.length; i++) {
+ if (lines[i].match(/^(huomio|huomautus|kuuluu|notes|remarks)/i)) {
+ let noteLines = [];
+ for (let j = i + 1; j < lines.length && j < i + 5; j++) {
+ const line = lines[j].trim();
+ if (!line || line.match(/^(ok|ok\?)/i)) break;
+ if (line) noteLines.push(line);
+ }
+ notes = noteLines.join(' ').trim();
+ break;
+ }
+ }
+ 
+ // ===== AUTO =====
  let car = '';
  const autoMatch = msg.match(/(?:auto|nro|ajoneuvo)[:\s]*(\w+)/i);
  if (autoMatch) {
  car = autoMatch[1].trim();
  } else {
- // Jos "auto:" ei löydy, etsii 3-4 merkkistä koodia
  const codeMatch = msg.match(/\b([A-Z0-9]{3,4})\b/);
  if (codeMatch) car = codeMatch[1];
  }
  
- // ===== ASETA KENTÄT (vain jos löydetty) =====
+ // ===== ASETA KENTÄT =====
  if (date) document.getElementById('inPvm').value = date;
  if (time) document.getElementById('inKlo').value = time;
  if (price) document.getElementById('inHinta').value = price;
@@ -503,7 +588,9 @@ String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  if (to) document.getElementById('inTo').value = to;
  if (customer) document.getElementById('inNimi').value = customer;
  if (phone) document.getElementById('inPuhelin').value = phone;
- if (billing) document.getElementById('inLasku').value = billing;
+ if (billing) document.getElementById('inTilaaja').value = billing;
+ if (invoiceParty) document.getElementById('inLasku').value = invoiceParty;
+ if (notes) document.getElementById('inHuomio').value = notes;
  if (car) document.getElementById('inAuto').value = car;
  };
  
