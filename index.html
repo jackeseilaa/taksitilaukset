@@ -1,177 +1,431 @@
 <!DOCTYPE html>
 <html lang="fi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kuljetuskirja V37.18</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
-    <style>
-        :root { 
-            --bg: #000000; --surface: #111111; --border: #333333; --accent: #c8f050; 
-            --accent2: #50c8f0; --text: #ffffff; --muted: #aaaaaa; --price-bg: #ffff00; --price-text: #000000;
-            --edit-mode: #1a3a1a; --edit-accent: #80ff80; --del: #ff4444;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); padding: 10px; line-height: 1.4; }
-        .v-tag { color: var(--muted); font-size: 11px; text-align: center; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; }
-        h1 { font-family: 'Syne', sans-serif; font-size: 1.2rem; text-align: center; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
-
-        .edit-mode-indicator { display: none; text-align: center; background: var(--edit-mode); border: 2px solid var(--edit-accent); color: var(--edit-accent); padding: 8px; border-radius: 4px; margin-bottom: 10px; font-weight: bold; text-transform: uppercase; font-size: 0.9rem; }
-        .edit-mode-indicator.active { display: block; }
-
-        textarea { width: 100%; background: var(--surface); border: 2px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 100px; font-size: 1rem; border-left: 6px solid var(--accent); outline: none; }
-        
-        .manual-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; background: #1a1a1a; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
-        .manual-fields input { background: #000; border: 1px solid #555; color: #fff; padding: 12px; border-radius: 4px; font-family: inherit; font-size: 0.9rem; width: 100%; }
-        .full-width { grid-column: span 2; }
-        label { font-size: 0.7rem; color: var(--accent2); text-transform: uppercase; margin-bottom: 3px; display: block; font-weight: bold; }
-        
-        .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
-        .btn-add { background: var(--accent); color: black; flex: 2; padding: 20px; border-radius: 8px; font-weight: 900; border: none; cursor: pointer; font-size: 1.1rem; text-transform: uppercase; min-width: 200px; }
-        .btn-csv { background: #333; color: white; flex: 1; border-radius: 8px; border: 2px solid #444; cursor: pointer; font-size: 0.8rem; font-weight: bold; min-width: 140px; padding: 10px; }
-        .btn-cancel { background: #4a3333; color: #ff8080; flex: 1; border-radius: 8px; border: 2px solid #6a4444; cursor: pointer; font-size: 0.8rem; font-weight: bold; display: none; padding: 10px; }
-        .btn-cancel.show { display: block; }
-        
-        .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; border: 1px solid var(--border); }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 1300px; }
-        th { text-align: left; color: #ffffff; padding: 15px 10px; border-bottom: 2px solid var(--accent); background: #000; text-transform: uppercase; font-weight: 900; }
-        td { padding: 12px 10px; border-bottom: 1px solid #333; vertical-align: top; }
-        
-        .price-tag { font-weight: 900; color: var(--price-text); background: var(--price-bg); padding: 4px 8px; border-radius: 4px; }
-        .action-btn { background: #222; border: 1px solid #444; font-size: 1.1rem; cursor: pointer; color: var(--accent2); padding: 6px 10px; border-radius: 4px; margin-right: 5px; }
-        .del-btn { color: var(--del); border-color: var(--del); }
-    </style>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, 
+user-scalable=no">
+ <title>Kuljetuskirja V37.20</title>
+ <link href="https://fonts.googleapis.com/css2?
+family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+ <style>
+ :root { 
+ --bg: #000000; --surface: #111111; --border: #333333; --accent: #c8f050; 
+ --accent2: #50c8f0; --text: #ffffff; --muted: #aaaaaa; --price-bg: #ffff00; --
+price-text: #000000;
+ --edit-mode: #1a3a1a; --edit-accent: #80ff80; --del: #ff4444;
+ }
+ * { box-sizing: border-box; margin: 0; padding: 0; }
+ body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); 
+padding: 10px; line-height: 1.4; }
+ .v-tag { color: var(--muted); font-size: 11px; text-align: center; margin-bottom: 
+5px; font-weight: bold; text-transform: uppercase; }
+ h1 { font-family: 'Syne', sans-serif; font-size: 1.2rem; text-align: center; color: 
+var(--accent); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
+ .edit-mode-indicator { display: none; text-align: center; background: var(--editmode); border: 2px solid var(--edit-accent); color: var(--edit-accent); padding: 8px; borderradius: 4px; margin-bottom: 10px; font-weight: bold; text-transform: uppercase; font-size: 
+0.9rem; }
+ .edit-mode-indicator.active { display: block; }
+ textarea { width: 100%; background: var(--surface); border: 2px solid var(--border); 
+border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 
+10px; min-height: 100px; font-size: 1rem; border-left: 6px solid var(--accent); outline: 
+none; }
+ 
+ .manual-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; marginbottom: 10px; background: #1a1a1a; padding: 12px; border-radius: 8px; border: 1px solid var(-
+-border); }
+ .manual-fields input { background: #000; border: 1px solid #555; color: #fff; 
+padding: 12px; border-radius: 4px; font-family: inherit; font-size: 0.9rem; width: 100%; }
+ .full-width { grid-column: span 2; }
+ label { font-size: 0.7rem; color: var(--accent2); text-transform: uppercase; marginbottom: 3px; display: block; font-weight: bold; }
+ 
+ .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+ .btn-add { background: var(--accent); color: black; flex: 2; padding: 20px; borderradius: 8px; font-weight: 900; border: none; cursor: pointer; font-size: 1.1rem; texttransform: uppercase; min-width: 200px; }
+ .btn-csv { background: #333; color: white; flex: 1; border-radius: 8px; border: 2px 
+solid #444; cursor: pointer; font-size: 0.8rem; font-weight: bold; min-width: 140px; padding: 
+10px; }
+ .btn-csv:hover { background: #444; }
+ .btn-csv.export-all { background: #2a4a2a; border-color: #4a8a4a; }
+ .btn-csv.export-date { background: #4a2a2a; border-color: #8a4a4a; }
+ .btn-csv.export-subscriber { background: #2a3a4a; border-color: #4a6a8a; }
+ .btn-cancel { background: #4a3333; color: #ff8080; flex: 1; border-radius: 8px; 
+border: 2px solid #6a4444; cursor: pointer; font-size: 0.8rem; font-weight: bold; display: 
+none; padding: 10px; }
+ .btn-cancel.show { display: block; }
+ 
+ .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 
+0; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+ .modal-overlay.active { display: flex; }
+ .modal-box { background: var(--surface); border: 2px solid var(--accent); border-radius: 
+8px; padding: 20px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto; }
+ .modal-title { color: var(--accent); font-weight: bold; margin-bottom: 15px; font-size: 
+1.1rem; }
+ .modal-field { margin-bottom: 12px; }
+ .modal-field label { display: block; margin-bottom: 5px; }
+ .modal-field input { width: 100%; background: #000; border: 1px solid #555; color: 
+#fff; padding: 10px; border-radius: 4px; font-family: inherit; }
+ .modal-buttons { display: flex; gap: 8px; margin-top: 15px; }
+ .modal-btn { flex: 1; padding: 10px; border-radius: 4px; border: none; cursor: pointer; 
+font-weight: bold; }
+ .modal-btn.ok { background: var(--accent); color: black; }
+ .modal-btn.cancel { background: #444; color: #fff; }
+ 
+ .table-wrapper { overflow-x: auto; background: var(--surface); border-radius: 8px; 
+border: 1px solid var(--border); }
+ table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 
+1400px; }
+ th { text-align: left; color: #ffffff; padding: 15px 10px; border-bottom: 2px solid 
+var(--accent); background: #000; text-transform: uppercase; font-weight: 900; }
+ td { padding: 12px 10px; border-bottom: 1px solid #333; vertical-align: top; }
+ 
+ .price-tag { font-weight: 900; color: var(--price-text); background: var(--price-bg); 
+padding: 4px 8px; border-radius: 4px; }
+ .action-btn { background: #222; border: 1px solid #444; font-size: 1.1rem; cursor: 
+pointer; color: var(--accent2); padding: 6px 10px; border-radius: 4px; margin-right: 5px; }
+ .del-btn { color: var(--del); border-color: var(--del); }
+ </style>
 </head>
 <body>
-
-<div class="v-tag">VERSIO 37.18 (Vakaa 37.11 + Auton numero + Tilaajan CSV)</div>
+<div class="v-tag">VERSIO 37.20 (Geminin korjaukset: päivämäärävertailu, Firebase-tuonti, turvallinen CSV)</div>
 <h1>KULJETUSKIRJA</h1>
-
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
-
-<textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
-
+<textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()">
+</textarea>
 <div class="manual-fields">
-    <div><label>Pvm</label><input type="text" id="inPvm"></div>
-    <div><label>Klo</label><input type="text" id="inKlo"></div>
-    <div><label>Auto</label><input type="text" id="inAuto"></div>
-    <div><label>Hinta (€)</label><input type="text" id="inHinta" style="background:#ffff00; color:#000; font-weight:bold;"></div>
-    <div><label>Tyyppi</label><input type="text" id="inTyyppi"></div>
-    <div class="full-width"><label>Lähtö</label><input type="text" id="inFrom"></div>
-    <div class="full-width"><label>Meno</label><input type="text" id="inTo"></div>
-    <div><label>Matkustaja</label><input type="text" id="inNimi"></div>
-    <div><label>Puhelin</label><input type="text" id="inPuhelin"></div>
-    <div><label>Tilaaja</label><input type="text" id="inTilaaja"></div>
-    <div class="full-width"><label>Lasku / Maksaja</label><input type="text" id="inLasku"></div>
-    <div class="full-width"><label>Huomio</label><input type="text" id="inHuomio"></div>
-    <div class="full-width"><label>Poikkeamat</label><input type="text" id="inPoikkeama"></div>
+ <div><label>Pvm</label><input type="text" id="inPvm"></div>
+ <div><label>Klo</label><input type="text" id="inKlo"></div>
+ <div><label>Auto</label><input type="text" id="inAuto"></div>
+ <div><label>Hinta (€)</label><input type="text" id="inHinta" style="background:#ffff00; 
+color:#000; font-weight:bold;"></div>
+ <div><label>Tyyppi</label><input type="text" id="inTyyppi"></div>
+ <div class="full-width"><label>Lähtö</label><input type="text" id="inFrom"></div>
+ <div class="full-width"><label>Meno</label><input type="text" id="inTo"></div>
+ <div><label>Matkustaja</label><input type="text" id="inNimi"></div>
+ <div><label>Puhelin</label><input type="text" id="inPuhelin"></div>
+ <div><label>Tilaaja</label><input type="text" id="inTilaaja"></div>
+ <div class="full-width"><label>Lasku / Maksaja</label><input type="text" id="inLasku">
+</div>
+ <div class="full-width"><label>Huomio</label><input type="text" id="inHuomio"></div>
+ <div class="full-width"><label>Poikkeamat</label><input type="text" id="inPoikkeama">
+</div>
+</div>
+<div class="btn-row">
+ <button class="btn-add" id="btnSave">TALLENNA TILAUS</button>
+ <button class="btn-csv export-all" onclick="openExportModal('all')">LATAA KOKO CSV</button>
+ <button class="btn-csv export-date" id="btnSetSMB" style="background: #2a4a2a;">ASETA SMB TÄNÄÄN</button>
+ <button class="btn-csv export-date" onclick="openExportModal('date')">LATAA PÄIVÄ/AIKAVÄLI</button>
+ <button class="btn-csv export-subscriber" onclick="exportSubscriberCSV()">LATAA TILAAJAN CSV</button>
+ <button class="btn-csv" id="btnClear" onclick="clearForm()" style="background: 
+#3a2a2a;">TYHJENNÄ</button>
+ <button class="btn-cancel" id="btnCancel" onclick="cancelEdit()">PERUUTA 
+MUOKKAUS</button>
 </div>
 
-<div class="btn-row">
-    <button class="btn-add" id="btnSave">TALLENNA TILAUS</button>
-    <button class="btn-csv" onclick="exportSubscriberCSV()" style="background: #8a2a50; border-color: #ff80a0;">LATAA TILAAJAN CSV</button>
-    <button class="btn-csv" onclick="exportToCSV('today')">LATAA CSV - TÄNÄÄN</button>
-    <button class="btn-csv" id="btnSetSMB" style="background: #2a4a2a;">ASETA SMB TÄNÄÄN</button>
-    <button class="btn-csv" id="btnClear" onclick="clearForm()" style="background: #3a2a2a;">TYHJENNÄ</button>
-    <button class="btn-cancel" id="btnCancel" onclick="cancelEdit()">PERUUTA MUOKKAUS</button>
+<!-- CSV Export Modal -->
+<div class="modal-overlay" id="exportModal">
+ <div class="modal-box">
+ <div class="modal-title" id="modalTitle">Lataa CSV</div>
+ <div class="modal-field" id="modeSelector">
+ <label>Valitse:</label>
+ <select id="exportMode" style="width:100%; background:#000; border:1px solid #555; color:#fff; padding:10px; border-radius:4px; font-family:inherit;">
+ <option value="today">Vain tänään</option>
+ <option value="single">Yksittäinen päivä</option>
+ <option value="range">Aikaväli</option>
+ </select>
+ </div>
+ <div class="modal-field" id="singleDateField" style="display:none;">
+ <label>Päivämäärä (pp.kk.yyyy)</label>
+ <input type="text" id="singleDate" placeholder="15.05.2026">
+ </div>
+ <div class="modal-field" id="rangeStartField" style="display:none;">
+ <label>Alkupäivä (pp.kk.yyyy)</label>
+ <input type="text" id="rangeStart" placeholder="01.05.2026">
+ </div>
+ <div class="modal-field" id="rangeEndField" style="display:none;">
+ <label>Loppupäivä (pp.kk.yyyy)</label>
+ <input type="text" id="rangeEnd" placeholder="15.05.2026">
+ </div>
+ <div class="modal-buttons">
+ <button class="modal-btn ok" onclick="performExport()">LATAA CSV</button>
+ <button class="modal-btn cancel" onclick="closeExportModal()">PERUUTA</button>
+ </div>
+ </div>
 </div>
 
 <div class="table-wrapper">
-    <table>
-        <thead><tr><th>AIKA</th><th>AUTO</th><th>REITTI</th><th>MATKUSTAJA</th><th>PUHELIN</th><th>TILAAJA</th><th>HINTA</th><th>LASKU</th><th>HUOMIO</th><th>TOIMINNOT</th></tr></thead>
-        <tbody id="logs"></tbody>
-    </table>
+ <table>
+ <thead><tr><th>AIKA</th><th>AUTO</th><th>REITTI</th><th>MATKUSTAJA</th>
+<th>PUHELIN</th><th>TILAAJA</th><th>HINTA</th><th>LASKU</th><th>HUOMIO</th><th>POIKKEAMA</th><th>TOIMINNOT</th>
+</tr></thead>
+ <tbody id="logs"></tbody>
+ </table>
 </div>
 
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    const firebaseConfig = { apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs", authDomain: "jsailing-f716c.firebaseapp.com", projectId: "jsailing-f716c", storageBucket: "jsailing-f716c.firebasestorage.app", appId: "1:543523103696:web:439a312efa6aec398a8fd5" };
-    const db = getFirestore(initializeApp(firebaseConfig));
-    
-    let currentLogs = [];
-    let editId = null;
-
-    onSnapshot(collection(db, "taksitulot"), (snap) => {
-        currentLogs = snap.docs.map(d => ({id: d.id, ...d.data()}));
-        const tbody = document.getElementById('logs');
-        tbody.innerHTML = '';
-        currentLogs.sort((a,b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time)).forEach(r => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><b>${r.date}</b><br>${r.time}</td>
-                <td>${r.car}</td>
-                <td>${r.from}<br>${r.to}</td>
-                <td>${r.customer}</td>
-                <td>${r.phone}</td>
-                <td>${r.orderer}</td>
-                <td><span class="price-tag">${r.price}€</span></td>
-                <td>${r.billing}</td>
-                <td>${r.notes}</td>
-                <td>
-                    <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
-                    <button class="action-btn del-btn" onclick="window.deleteEntry('${r.id}')">X</button>
-                </td>`;
-            tbody.appendChild(tr);
-        });
-    });
-
-    document.getElementById('btnSave').onclick = async () => {
-        const data = {
-            date: document.getElementById('inPvm').value, time: document.getElementById('inKlo').value,
-            car: document.getElementById('inAuto').value, price: document.getElementById('inHinta').value,
-            type: document.getElementById('inTyyppi').value, from: document.getElementById('inFrom').value,
-            to: document.getElementById('inTo').value, customer: document.getElementById('inNimi').value,
-            phone: document.getElementById('inPuhelin').value, orderer: document.getElementById('inTilaaja').value,
-            billing: document.getElementById('inLasku').value, notes: document.getElementById('inHuomio').value,
-            deviation: document.getElementById('inPoikkeama').value
-        };
-        if (editId) { await updateDoc(doc(db, "taksitulot", editId), data); cancelEdit(); }
-        else { await addDoc(collection(db, "taksitulot"), data); }
-        clearForm();
-    };
-
-    window.prepareEdit = (id) => {
-        const r = currentLogs.find(l => l.id === id);
-        if (!r) return;
-        editId = id;
-        document.getElementById('inPvm').value = r.date || '';
-        document.getElementById('inKlo').value = r.time || '';
-        document.getElementById('inAuto').value = r.car || '';
-        document.getElementById('inHinta').value = r.price || '';
-        document.getElementById('inFrom').value = r.from || '';
-        document.getElementById('inTo').value = r.to || '';
-        document.getElementById('inNimi').value = r.customer || '';
-        document.getElementById('inPuhelin').value = r.phone || '';
-        document.getElementById('inTilaaja').value = r.orderer || '';
-        document.getElementById('inLasku').value = r.billing || '';
-        document.getElementById('inHuomio').value = r.notes || '';
-        document.getElementById('inPoikkeama').value = r.deviation || '';
-        document.getElementById('editModeIndicator').classList.add('active');
-        document.getElementById('btnCancel').classList.add('show');
-        document.getElementById('btnSave').innerText = "PÄIVITÄ TILAUS";
-        window.scrollTo(0,0);
-    };
-
-    window.deleteEntry = async (id) => { if(confirm("Poista tilaus?")) await deleteDoc(doc(db, "taksitulot", id)); };
-    window.cancelEdit = () => { editId = null; document.getElementById('editModeIndicator').classList.remove('active'); document.getElementById('btnCancel').classList.remove('show'); document.getElementById('btnSave').innerText = "TALLENNA TILAUS"; clearForm(); };
-    window.clearForm = () => { document.querySelectorAll('input, textarea').forEach(i => i.value = ''); };
-
-    window.exportSubscriberCSV = () => {
-        const filtered = currentLogs.filter(r => {
-            const car = (r.car || "").toString().trim();
-            return car !== "" && !/^\d+$/.test(car);
-        });
-        let csv = "\uFEFFPäivä;Aika;Mistä;Mihin;Kuka kyydissä;Ketä laskutetaan;Summa;Auto;Huomio\n";
-        filtered.forEach(r => { csv += `${r.date};${r.time};${r.from};${r.to};${r.customer};${r.billing};${r.price};${r.car};${r.notes}\n`; });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-        link.download = "tilaajan_erittely.csv"; link.click();
-    };
-
-    document.getElementById('btnSetSMB').onclick = () => { document.getElementById('inAuto').value = "SMB"; document.getElementById('inPvm').value = new Date().toLocaleDateString('fi-FI'); };
-    window.exportToCSV = (type) => { /* Täysi CSV-logiikka tänään varten */ };
+ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+ import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc, updateDoc } 
+from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+ 
+ // ⚠️ HUOMIO: Siirrä Firebase-konfiguraatio .env -tiedostoon tuotannossa!
+ const firebaseConfig = { 
+ apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs", 
+ authDomain: "jsailing-f716c.firebaseapp.com", 
+ projectId: "jsailing-f716c", 
+ storageBucket: "jsailing-f716c.firebasestorage.app", 
+ appId: "1:543523103696:web:439a312efa6aec398a8fd5" 
+ };
+ 
+ const db = getFirestore(initializeApp(firebaseConfig));
+ 
+ let currentLogs = [];
+ let editId = null;
+ let exportMode = 'today';
+ 
+ onSnapshot(collection(db, "taksitulot"), (snap) => {
+ currentLogs = snap.docs.map(d => ({id: d.id, ...d.data()}));
+ renderTable();
+ });
+ 
+ function renderTable() {
+ const tbody = document.getElementById('logs');
+ tbody.innerHTML = '';
+ currentLogs.sort((a,b) => b.date.localeCompare(a.date) || 
+b.time.localeCompare(a.time)).forEach(r => {
+ const tr = document.createElement('tr');
+ tr.innerHTML = `
+ <td><b>${r.date || '-'}</b><br>${r.time || '-'}</td>
+ <td>${r.car || '-'}</td>
+ <td>${r.from || '-'}<br>${r.to || '-'}</td>
+ <td>${r.customer || '-'}</td>
+ <td>${r.phone || '-'}</td>
+ <td>${r.orderer || '-'}</td>
+ <td><span class="price-tag">${r.price || '0'}€</span></td>
+ <td>${r.billing || '-'}</td>
+ <td>${r.notes || '-'}</td>
+ <td>${r.deviation || '-'}</td>
+ <td>
+ <button class="action-btn" 
+onclick="window.prepareEdit('${r.id}')">✎</button>
+ <button class="action-btn del-btn" 
+onclick="window.deleteEntry('${r.id}')">X</button>
+ </td>`;
+ tbody.appendChild(tr);
+ });
+ }
+ 
+ document.getElementById('btnSave').onclick = async () => {
+ const data = {
+ date: document.getElementById('inPvm').value, 
+ time: document.getElementById('inKlo').value,
+ car: document.getElementById('inAuto').value, 
+ price: document.getElementById('inHinta').value,
+ type: document.getElementById('inTyyppi').value, 
+ from: document.getElementById('inFrom').value,
+ to: document.getElementById('inTo').value, 
+ customer: document.getElementById('inNimi').value,
+ phone: document.getElementById('inPuhelin').value, 
+ orderer: document.getElementById('inTilaaja').value,
+ billing: document.getElementById('inLasku').value, 
+ notes: document.getElementById('inHuomio').value,
+ deviation: document.getElementById('inPoikkeama').value
+ };
+ if (editId) { 
+ await updateDoc(doc(db, "taksitulot", editId), data); 
+ cancelEdit(); 
+ } else { 
+ await addDoc(collection(db, "taksitulot"), data); 
+ }
+ clearForm();
+ };
+ 
+ window.prepareEdit = (id) => {
+ const r = currentLogs.find(l => l.id === id);
+ if (!r) return;
+ editId = id;
+ document.getElementById('inPvm').value = r.date || '';
+ document.getElementById('inKlo').value = r.time || '';
+ document.getElementById('inAuto').value = r.car || '';
+ document.getElementById('inHinta').value = r.price || '';
+ document.getElementById('inTyyppi').value = r.type || '';
+ document.getElementById('inFrom').value = r.from || '';
+ document.getElementById('inTo').value = r.to || '';
+ document.getElementById('inNimi').value = r.customer || '';
+ document.getElementById('inPuhelin').value = r.phone || '';
+ document.getElementById('inTilaaja').value = r.orderer || '';
+ document.getElementById('inLasku').value = r.billing || '';
+ document.getElementById('inHuomio').value = r.notes || '';
+ document.getElementById('inPoikkeama').value = r.deviation || '';
+ document.getElementById('editModeIndicator').classList.add('active');
+ document.getElementById('btnCancel').classList.add('show');
+ document.getElementById('btnSave').innerText = "PÄIVITÄ TILAUS";
+ window.scrollTo(0,0);
+ };
+ 
+ window.deleteEntry = async (id) => { 
+ if(confirm("Poista tilaus?")) await deleteDoc(doc(db, "taksitulot", id)); 
+ };
+ 
+ window.cancelEdit = () => { 
+ editId = null; 
+ document.getElementById('editModeIndicator').classList.remove('active'); 
+ document.getElementById('btnCancel').classList.remove('show'); 
+ document.getElementById('btnSave').innerText = "TALLENNA TILAUS"; 
+ clearForm(); 
+ };
+ 
+ window.clearForm = () => { 
+ document.querySelectorAll('input, textarea').forEach(i => i.value = ''); 
+ };
+ 
+ // ===== PARSE MESSAGE FUNCTION =====
+ window.parseMessage = () => {
+ const msg = document.getElementById('msgInput').value.trim();
+ if (!msg) return;
+ 
+ const today = new Date();
+ const todayStr = String(today.getDate()).padStart(2,'0') + '.' + 
+String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
+ 
+ // Päivämäärä (tänään, huomenna, tai pp.kk.yyyy)
+ let date = '';
+ if (msg.toLowerCase().includes('tänään')) {
+ date = todayStr;
+ } else if (msg.toLowerCase().includes('huomenna')) {
+ const tomorrow = new Date(today);
+ tomorrow.setDate(tomorrow.getDate() + 1);
+ date = String(tomorrow.getDate()).padStart(2,'0') + '.' + 
+String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
+ } else {
+ const dateMatch = msg.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+ if (dateMatch) date = dateMatch[0];
+ }
+ 
+ // Aika (hh:mm)
+ const timeMatch = msg.match(/(\d{1,2}):(\d{2})/);
+ const time = timeMatch ? timeMatch[0] : '';
+ 
+ // Hinta (numero€ tai numero,xx€)
+ const priceMatch = msg.match(/([\d,]+)\s*€/);
+ const price = priceMatch ? priceMatch[1].replace(',', '.') : '';
+ 
+ // Reitti (sanoista "mistä", "mihin", "-", "->")
+ let from = '', to = '';
+ const routeMatch = msg.match(/mistä[:\s]*([^\n]*?)(?:mihin|->|-)/i);
+ const toMatch = msg.match(/(?:mihin|->|-)[:\s]*([^\n]*?)(?:\n|€|hinta|lasku|laskut)/i);
+ if (routeMatch) from = routeMatch[1].trim();
+ if (toMatch) to = toMatch[1].trim();
+ 
+ // Matkustaja ja puhelin (luvut jotka muistuttavat puhelinnumerosta)
+ const phoneMatch = msg.match(/(\d{9,})/);
+ const phone = phoneMatch ? phoneMatch[1] : '';
+ 
+ // Laskutusosapuoli (sanoista "lasku", "laskutus", "maksaja")
+ const billingMatch = msg.match(/(?:lasku|laskutus|maksaja)[:\s]*([^\n]*?)(?:\n|€)/i);
+ const billing = billingMatch ? billingMatch[1].trim() : '';
+ 
+ // Aseta kentät
+ if (date) document.getElementById('inPvm').value = date;
+ if (time) document.getElementById('inKlo').value = time;
+ if (price) document.getElementById('inHinta').value = price;
+ if (from) document.getElementById('inFrom').value = from;
+ if (to) document.getElementById('inTo').value = to;
+ if (phone) document.getElementById('inPuhelin').value = phone;
+ if (billing) document.getElementById('inLasku').value = billing;
+ };
+ 
+ // ===== APUFUNKTIO: Suomalaisen päivämäärän muuntaminen Date-objektiksi =====
+ function parseFinnishDate(dateStr) {
+ if (!dateStr) return null;
+ const parts = dateStr.split('.');
+ if (parts.length !== 3) return null;
+ return new Date(parts[2], parts[1] - 1, parts[0]);
+ }
+ 
+ // ===== CSV EXPORT FUNCTIONS =====
+ window.openExportModal = (mode) => {
+ exportMode = mode;
+ document.getElementById('exportModal').classList.add('active');
+ document.getElementById('singleDateField').style.display = 'none';
+ document.getElementById('rangeStartField').style.display = 'none';
+ document.getElementById('rangeEndField').style.display = 'none';
+ document.getElementById('exportMode').value = 'today';
+ };
+ 
+ window.closeExportModal = () => {
+ document.getElementById('exportModal').classList.remove('active');
+ };
+ 
+ document.getElementById('exportMode')?.addEventListener('change', (e) => {
+ document.getElementById('singleDateField').style.display = e.target.value === 'single' ? 'block' : 'none';
+ document.getElementById('rangeStartField').style.display = e.target.value === 'range' ? 'block' : 'none';
+ document.getElementById('rangeEndField').style.display = e.target.value === 'range' ? 'block' : 'none';
+ });
+ 
+ window.performExport = () => {
+ const mode = document.getElementById('exportMode').value;
+ let filtered = [...currentLogs];
+ 
+ const today = new Date();
+ today.setHours(0,0,0,0);
+ const todayStr = String(today.getDate()).padStart(2,'0') + '.' + String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
+ 
+ if (exportMode === 'all') {
+ // Ei suodatusta
+ } else if (mode === 'today') {
+ filtered = filtered.filter(r => r.date === todayStr);
+ } else if (mode === 'single') {
+ const targetDate = document.getElementById('singleDate').value;
+ filtered = filtered.filter(r => r.date === targetDate);
+ } else if (mode === 'range') {
+ const start = parseFinnishDate(document.getElementById('rangeStart').value);
+ const end = parseFinnishDate(document.getElementById('rangeEnd').value);
+ 
+ filtered = filtered.filter(r => {
+ const current = parseFinnishDate(r.date);
+ if (!current || !start || !end) return false;
+ return current >= start && current <= end;
+ });
+ }
+ 
+ generateCSV(filtered);
+ closeExportModal();
+ };
+ 
+ function generateCSV(rows) {
+ // Lisätty BOM-tunniste Exceliä varten ja varmistettu kenttien olemassaolo
+ let csv = "\uFEFFPäivä;Aika;Auto;Reitti (Mistä-Mihin);Matkustaja;Puhelin;Tilaaja;Hinta;Lasku;Huomio;Poikkeama\n";
+ rows.forEach(r => {
+ const from = r.from || '-';
+ const to = r.to || '-';
+ const route = `${from} → ${to}`;
+ csv += `${r.date || ''};${r.time || ''};${r.car || ''};${route};${r.customer || ''};${r.phone || ''};${r.orderer || ''};${r.price || '0'};${r.billing || ''};${r.notes || ''};${r.deviation || ''}\n`;
+ });
+ 
+ const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+ const url = URL.createObjectURL(blob);
+ const link = document.createElement("a");
+ link.href = url;
+ link.download = `kuljetuskirja_vienti_${new Date().toISOString().split('T')[0]}.csv`;
+ link.click();
+ }
+ 
+ window.exportSubscriberCSV = () => {
+ const filtered = currentLogs.filter(r => {
+ const car = (r.car || "").toString().trim();
+ return car !== "" && !/^\d+$/.test(car);
+ });
+ let csv = "\uFEFFPäivä;Aika;Mistä;Mihin;Kuka kyydissä;Ketä laskutetaan;Summa;Auto;Huomio\n";
+ filtered.forEach(r => { 
+ csv += `${r.date || ''};${r.time || ''};${r.from || ''};${r.to || ''};${r.customer || ''};${r.billing || ''};${r.price || ''};${r.car || ''};${r.notes || ''}\n`; 
+ });
+ const link = document.createElement("a");
+ link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+ link.download = "tilaajan_erittely.csv"; 
+ link.click();
+ };
+ 
+ document.getElementById('btnSetSMB').onclick = () => { 
+ document.getElementById('inAuto').value = "SMB"; 
+ document.getElementById('inPvm').value = new Date().toLocaleDateString('fi-FI'); 
+ };
+ 
 </script>
 </body>
 </html>
