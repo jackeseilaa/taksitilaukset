@@ -775,7 +775,23 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  return String(val).replace(/;/g, ',').replace(/"/g, '').trim();
  };
  
- csv += `${sanitize(r.date)};${sanitize(r.time)};${sanitize(r.car)};${sanitize(route)};${sanitize(r.customer)};${sanitize(r.phone)};${sanitize(r.orderer)};${sanitize(r.price || '0')};${sanitize(r.billing)};${sanitize(r.notes)};${sanitize(r.deviation)}\n`;
+ // ===== PUHELINNUMERON FORMATOINTI =====
+ const formatPhone = (phone) => {
+ if (!phone) return '';
+ // Poista kaikki erikoismerkit
+ const cleaned = phone.replace(/\D/g, '');
+ // Jos alkaa 358:lla (Suomen numero):
+ // +358417730 → +358 44 173 30 tai +358 (44) 173 30
+ if (cleaned.startsWith('358')) {
+ const country = cleaned.slice(0, 3);
+ const area = cleaned.slice(3, 5);
+ const local = cleaned.slice(5);
+ return `+${country} ${area} ${local}`;
+ }
+ return `+${cleaned}`;
+ };
+ 
+ csv += `${sanitize(r.date)};${sanitize(r.time)};${sanitize(r.car)};${sanitize(route)};${sanitize(r.customer)};${sanitize(formatPhone(r.phone))};${sanitize(r.orderer)};${sanitize(r.price || '0')};${sanitize(r.billing)};${sanitize(r.notes)};${sanitize(r.deviation)}\n`;
  });
  
  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
