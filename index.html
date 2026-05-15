@@ -4,7 +4,7 @@
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, 
 user-scalable=no">
- <title>Kuljetuskirja V37.29</title>
+ <title>Kuljetuskirja V37.31</title>
  <link href="https://fonts.googleapis.com/css2?
 family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
@@ -84,7 +84,7 @@ pointer; color: var(--accent2); padding: 6px 10px; border-radius: 4px; margin-ri
  </style>
 </head>
 <body>
-<div class="v-tag">VERSIO 37.29 (FINAL - Korjattu msgLower duplikaatti) (FINAL - Päivämäärä ensiöity, Lasku regex fix, Väri-logiikka, Hinnan kontrasti) (Geminin hyväksymä - puhdistettu / ja välilyönnit) (Monirivinen parseMessage: Nimi/Tilaaja/Lasku erottelu, pp.kk täydennys, Huomio)</div>
+<div class="v-tag">VERSIO 37.31 (DEBUG - Avaa Console F12 ja katso viestit) (PRODUCTION READY - Maksu autoon tunnistus lisätty) (FINAL - Korjattu msgLower duplikaatti) (FINAL - Päivämäärä ensiöity, Lasku regex fix, Väri-logiikka, Hinnan kontrasti) (Geminin hyväksymä - puhdistettu / ja välilyönnit) (Monirivinen parseMessage: Nimi/Tilaaja/Lasku erottelu, pp.kk täydennys, Huomio)</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()">
@@ -192,12 +192,16 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  });
  
  onSnapshot(collection(db, "taksitulot"), (snap) => {
+ console.log("✅ Firestore-data vastaanotettu, rivejä:", snap.docs.length);
  currentLogs = snap.docs.map(d => ({id: d.id, ...d.data()}));
+ console.log("📋 currentLogs päivitetty, yhteensä:", currentLogs.length, "tilausta");
  renderTable();
  }, (error) => {
- console.error("Firestore-virhe:", error);
+ console.error("❌ Firestore-virhe:", error);
  showError("Tietokantavirhe: " + error.message);
  });
+ 
+ console.log("🔧 Firestore listener asetettu, odotetaan dataa...");
  
  /* ===== TAULUKKO-RENDERÖINTI =====
   * GEMININ KRIITTINEN KORJAUS: Lajittelu nyt käyttää parseFinnishDate-funktiota!
@@ -208,6 +212,7 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
   *   new Date(2026, 0, 10) > new Date(2026, 1, 2) = TRUE ✓
   */
  function renderTable() {
+ console.log("🎨 renderTable() kutsuttu, currentLogs.length =", currentLogs.length);
  const tbody = document.getElementById('logs');
  tbody.innerHTML = '';
  
@@ -562,9 +567,10 @@ String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  
  // TÄRKEÄ: "laskulle" ennen "lasku" jotta pitempi alternative matchaa ensin!
  // Word boundary \b estää "lasku" matchaamisen "laskulle":sta
+ // LISÄTTY: Tunne myös "maksu autoon"
  for (let i = 0; i < lines.length; i++) {
  const trimmedLine = lines[i].trim();
- const match = trimmedLine.match(/^[\s\/]*(laskulle|lasku)\b[:\s\/]*(.*)$/i);
+ const match = trimmedLine.match(/^[\s\/]*(laskulle|lasku|maksu)\b[:\s\/]*(.*)$/i);
  if (match) {
  let invoiceLines = [];
  // Lisää saman rivin loppuosa - puhdista "/" ja välilyönnit!
@@ -577,11 +583,14 @@ String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  // Kerää seuraavat rivit kunnes "Huomio" / "Kuuluu" / "Ok" - puhdista myös ne!
  for (let j = i + 1; j < lines.length && j < i + 3; j++) {
  let line = lines[j].trim().replace(/^[\s\/]+/, '').trim();
- if (!line || line.match(/^[\s\/]*(huomio|kuuluu|ok)/i)) break;
+ if (!line || line.match(/^[\s\/]*(huomio|kuuluu|ok|muista)/i)) break;
  if (line) invoiceLines.push(line);
  }
  if (invoiceLines.length > 0) {
  invoiceParty = invoiceLines.join(' ').trim();
+ } else if (match[1] && match[1].toLowerCase() === 'maksu') {
+ // Jos "Maksu" eikä seuraa sisältöä, aseta "Maksu autoon"
+ invoiceParty = 'Maksu autoon';
  } else {
  invoiceParty = billing;
  }
