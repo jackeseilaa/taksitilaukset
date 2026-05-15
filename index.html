@@ -4,7 +4,7 @@
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, 
 user-scalable=no">
- <title>Kuljetuskirja V37.20</title>
+ <title>Kuljetuskirja V37.22</title>
  <link href="https://fonts.googleapis.com/css2?
 family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
@@ -80,31 +80,33 @@ padding: 4px 8px; border-radius: 4px; }
  .action-btn { background: #222; border: 1px solid #444; font-size: 1.1rem; cursor: 
 pointer; color: var(--accent2); padding: 6px 10px; border-radius: 4px; margin-right: 5px; }
  .del-btn { color: var(--del); border-color: var(--del); }
+ .error-msg { color: #ff6666; font-size: 0.9rem; margin-top: 5px; }
  </style>
 </head>
 <body>
-<div class="v-tag">VERSIO 37.20 (Geminin korjaukset: päivämäärävertailu, Firebase-tuonti, turvallinen CSV)</div>
+<div class="v-tag">VERSIO 37.22 (Geminin korjaukset: Lajittelu, Auto-tunnistus parseMessage, oletusarvot)</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()">
 </textarea>
 <div class="manual-fields">
- <div><label>Pvm</label><input type="text" id="inPvm"></div>
- <div><label>Klo</label><input type="text" id="inKlo"></div>
- <div><label>Auto</label><input type="text" id="inAuto"></div>
+ <div><label>Pvm</label><input type="text" id="inPvm" placeholder="pp.kk.yyyy"></div>
+ <div><label>Klo</label><input type="text" id="inKlo" placeholder="hh:mm"></div>
+ <div><label>Auto</label><input type="text" id="inAuto" placeholder="123 tai SMB"></div>
  <div><label>Hinta (€)</label><input type="text" id="inHinta" style="background:#ffff00; 
-color:#000; font-weight:bold;"></div>
+color:#000; font-weight:bold;" placeholder="0.00"></div>
  <div><label>Tyyppi</label><input type="text" id="inTyyppi"></div>
  <div class="full-width"><label>Lähtö</label><input type="text" id="inFrom"></div>
  <div class="full-width"><label>Meno</label><input type="text" id="inTo"></div>
  <div><label>Matkustaja</label><input type="text" id="inNimi"></div>
- <div><label>Puhelin</label><input type="text" id="inPuhelin"></div>
+ <div><label>Puhelin</label><input type="text" id="inPuhelin" placeholder="+358..."></div>
  <div><label>Tilaaja</label><input type="text" id="inTilaaja"></div>
  <div class="full-width"><label>Lasku / Maksaja</label><input type="text" id="inLasku">
 </div>
  <div class="full-width"><label>Huomio</label><input type="text" id="inHuomio"></div>
  <div class="full-width"><label>Poikkeamat</label><input type="text" id="inPoikkeama">
 </div>
+ <div class="full-width" id="errorMsg" style="display:none;"></div>
 </div>
 <div class="btn-row">
  <button class="btn-add" id="btnSave">TALLENNA TILAUS</button>
@@ -121,7 +123,7 @@ MUOKKAUS</button>
 <!-- CSV Export Modal -->
 <div class="modal-overlay" id="exportModal">
  <div class="modal-box">
- <div class="modal-title" id="modalTitle">Lataa CSV</div>
+ <div class="modal-title">Lataa CSV</div>
  <div class="modal-field" id="modeSelector">
  <label>Valitse:</label>
  <select id="exportMode" style="width:100%; background:#000; border:1px solid #555; color:#fff; padding:10px; border-radius:4px; font-family:inherit;">
@@ -142,6 +144,7 @@ MUOKKAUS</button>
  <label>Loppupäivä (pp.kk.yyyy)</label>
  <input type="text" id="rangeEnd" placeholder="15.05.2026">
  </div>
+ <div class="modal-field" id="exportErrorMsg" style="display:none;"></div>
  <div class="modal-buttons">
  <button class="modal-btn ok" onclick="performExport()">LATAA CSV</button>
  <button class="modal-btn cancel" onclick="closeExportModal()">PERUUTA</button>
@@ -160,10 +163,9 @@ MUOKKAUS</button>
 
 <script type="module">
  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
- import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc, updateDoc } 
+ import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } 
 from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
  
- // ⚠️ HUOMIO: Siirrä Firebase-konfiguraatio .env -tiedostoon tuotannossa!
  const firebaseConfig = { 
  apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs", 
  authDomain: "jsailing-f716c.firebaseapp.com", 
@@ -178,54 +180,123 @@ from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
  let editId = null;
  let exportMode = 'today';
  
+ /* ===== SIVU-ALUSTUS =====
+  * Kun sivu ladataan, täytetään inPvm tämän päivän päivämäärällä.
+  * GEMININ EHDOTUS: Nopeuttaa syöttöä, koska useimmat tilaukset ovat tänään.
+  */
+ window.addEventListener('DOMContentLoaded', () => {
+ const today = new Date();
+ const todayStr = String(today.getDate()).padStart(2,'0') + '.' + 
+String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
+ document.getElementById('inPvm').value = todayStr;
+ });
+ 
  onSnapshot(collection(db, "taksitulot"), (snap) => {
  currentLogs = snap.docs.map(d => ({id: d.id, ...d.data()}));
  renderTable();
+ }, (error) => {
+ console.error("Firestore-virhe:", error);
+ showError("Tietokantavirhe: " + error.message);
  });
  
+ /* ===== TAULUKKO-RENDERÖINTI =====
+  * GEMININ KRIITTINEN KORJAUS: Lajittelu nyt käyttää parseFinnishDate-funktiota!
+  * ONGELMA (ENNEN): localeCompare merkkijonoilla pp.kk.yyyy lajittelee väärin:
+  *   "10.01.2026" < "02.02.2026" (merkkijono-tasolla '1' < '0'!)
+  *   Tämä jättää uusimmat tilaukset taulukon keskelle.
+  * RATKAISU: Muunnetaan Date-objekteiksi vertailua varten.
+  *   new Date(2026, 0, 10) > new Date(2026, 1, 2) = TRUE ✓
+  */
  function renderTable() {
  const tbody = document.getElementById('logs');
  tbody.innerHTML = '';
- currentLogs.sort((a,b) => b.date.localeCompare(a.date) || 
-b.time.localeCompare(a.time)).forEach(r => {
+ 
+ // Lajittelu: ensin uusimmat päivämäärät (Date-objektilla), sitten kellonajat
+ const sorted = [...currentLogs].sort((a, b) => {
+ const dateA = parseFinnishDate(a.date);
+ const dateB = parseFinnishDate(b.date);
+ 
+ // Jos päivämäärät ovat samat, lajitellaan kellonajan perusteella
+ if (!dateA || !dateB) return 0;
+ if (dateB - dateA !== 0) return dateB - dateA;
+ return (b.time || '').localeCompare(a.time || '');
+ });
+ 
+ sorted.forEach(r => {
  const tr = document.createElement('tr');
  tr.innerHTML = `
- <td><b>${r.date || '-'}</b><br>${r.time || '-'}</td>
- <td>${r.car || '-'}</td>
- <td>${r.from || '-'}<br>${r.to || '-'}</td>
- <td>${r.customer || '-'}</td>
- <td>${r.phone || '-'}</td>
- <td>${r.orderer || '-'}</td>
- <td><span class="price-tag">${r.price || '0'}€</span></td>
- <td>${r.billing || '-'}</td>
- <td>${r.notes || '-'}</td>
- <td>${r.deviation || '-'}</td>
+ <td><b>${escapeHtml(r.date || '-')}</b><br>${escapeHtml(r.time || '-')}</td>
+ <td>${escapeHtml(r.car || '-')}</td>
+ <td>${escapeHtml(r.from || '-')}<br>${escapeHtml(r.to || '-')}</td>
+ <td>${escapeHtml(r.customer || '-')}</td>
+ <td>${escapeHtml(r.phone || '-')}</td>
+ <td>${escapeHtml(r.orderer || '-')}</td>
+ <td><span class="price-tag">${escapeHtml(r.price || '0')}€</span></td>
+ <td>${escapeHtml(r.billing || '-')}</td>
+ <td>${escapeHtml(r.notes || '-')}</td>
+ <td>${escapeHtml(r.deviation || '-')}</td>
  <td>
- <button class="action-btn" 
-onclick="window.prepareEdit('${r.id}')">✎</button>
- <button class="action-btn del-btn" 
-onclick="window.deleteEntry('${r.id}')">X</button>
+ <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
+ <button class="action-btn del-btn" onclick="window.deleteEntry('${r.id}')">X</button>
  </td>`;
  tbody.appendChild(tr);
  });
  }
  
- document.getElementById('btnSave').onclick = async () => {
- const data = {
- date: document.getElementById('inPvm').value, 
- time: document.getElementById('inKlo').value,
- car: document.getElementById('inAuto').value, 
- price: document.getElementById('inHinta').value,
- type: document.getElementById('inTyyppi').value, 
- from: document.getElementById('inFrom').value,
- to: document.getElementById('inTo').value, 
- customer: document.getElementById('inNimi').value,
- phone: document.getElementById('inPuhelin').value, 
- orderer: document.getElementById('inTilaaja').value,
- billing: document.getElementById('inLasku').value, 
- notes: document.getElementById('inHuomio').value,
- deviation: document.getElementById('inPoikkeama').value
+ function escapeHtml(text) {
+ if (!text) return '';
+ const map = {
+ '&': '&amp;',
+ '<': '&lt;',
+ '>': '&gt;',
+ '"': '&quot;',
+ "'": '&#039;'
  };
+ return String(text).replace(/[&<>"']/g, m => map[m]);
+ }
+ 
+ function showError(msg) {
+ const errorDiv = document.getElementById('errorMsg');
+ errorDiv.innerHTML = `<div class="error-msg">⚠️ ${escapeHtml(msg)}</div>`;
+ errorDiv.style.display = 'block';
+ setTimeout(() => { errorDiv.style.display = 'none'; }, 5000);
+ }
+ 
+ document.getElementById('btnSave').onclick = async () => {
+ try {
+ const data = {
+ date: document.getElementById('inPvm').value.trim(), 
+ time: document.getElementById('inKlo').value.trim(),
+ car: document.getElementById('inAuto').value.trim(), 
+ price: document.getElementById('inHinta').value.trim(),
+ type: document.getElementById('inTyyppi').value.trim(), 
+ from: document.getElementById('inFrom').value.trim(),
+ to: document.getElementById('inTo').value.trim(), 
+ customer: document.getElementById('inNimi').value.trim(),
+ phone: document.getElementById('inPuhelin').value.trim(), 
+ orderer: document.getElementById('inTilaaja').value.trim(),
+ billing: document.getElementById('inLasku').value.trim(), 
+ notes: document.getElementById('inHuomio').value.trim(),
+ deviation: document.getElementById('inPoikkeama').value.trim()
+ };
+ 
+ if (!data.date) {
+ showError("Päivämäärä pakollinen (pp.kk.yyyy)");
+ return;
+ }
+ if (!validateFinnishDate(data.date)) {
+ showError("Virheellinen päivämäärä. Käytä muotoa pp.kk.yyyy");
+ return;
+ }
+ if (!data.price) {
+ showError("Hinta pakollinen");
+ return;
+ }
+ if (isNaN(parseFloat(data.price))) {
+ showError("Hinta pitää olla numero");
+ return;
+ }
+ 
  if (editId) { 
  await updateDoc(doc(db, "taksitulot", editId), data); 
  cancelEdit(); 
@@ -233,11 +304,34 @@ onclick="window.deleteEntry('${r.id}')">X</button>
  await addDoc(collection(db, "taksitulot"), data); 
  }
  clearForm();
+ } catch (error) {
+ showError("Tallennusvirhe: " + error.message);
+ console.error(error);
+ }
  };
+ 
+ function validateFinnishDate(dateStr) {
+ if (!dateStr) return false;
+ const match = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+ if (!match) return false;
+ const day = parseInt(match[1], 10);
+ const month = parseInt(match[2], 10);
+ const year = parseInt(match[3], 10);
+ 
+ if (month < 1 || month > 12) return false;
+ if (day < 1 || day > 31) return false;
+ if (year < 2020 || year > 2100) return false;
+ 
+ const date = new Date(year, month - 1, day);
+ return date.getMonth() === month - 1 && date.getDate() === day;
+ }
  
  window.prepareEdit = (id) => {
  const r = currentLogs.find(l => l.id === id);
- if (!r) return;
+ if (!r) {
+ showError("Tilausta ei löydy");
+ return;
+ }
  editId = id;
  document.getElementById('inPvm').value = r.date || '';
  document.getElementById('inKlo').value = r.time || '';
@@ -259,7 +353,14 @@ onclick="window.deleteEntry('${r.id}')">X</button>
  };
  
  window.deleteEntry = async (id) => { 
- if(confirm("Poista tilaus?")) await deleteDoc(doc(db, "taksitulot", id)); 
+ if(confirm("Poista tilaus?")) {
+ try {
+ await deleteDoc(doc(db, "taksitulot", id));
+ } catch (error) {
+ showError("Poistamisvirhe: " + error.message);
+ console.error(error);
+ }
+ }
  };
  
  window.cancelEdit = () => { 
@@ -271,10 +372,26 @@ onclick="window.deleteEntry('${r.id}')">X</button>
  };
  
  window.clearForm = () => { 
- document.querySelectorAll('input, textarea').forEach(i => i.value = ''); 
+ document.querySelectorAll('input, textarea').forEach(i => {
+ // Palauta inPvm tämän päivän päivämäärään
+ if (i.id === 'inPvm') {
+ const today = new Date();
+ const todayStr = String(today.getDate()).padStart(2,'0') + '.' + 
+String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
+ i.value = todayStr;
+ } else {
+ i.value = '';
+ }
+ });
  };
  
- // ===== PARSE MESSAGE FUNCTION =====
+ /* ===== PARSEAAVIESTI SUOMALAISESTA TAKSIVARAUKSESTA =====
+  * GEMININ KORJAUS: Lisätty Auto-tunnistus!
+  * UUDET TUNNISTIMET:
+  *   - "auto: 123" tai "auto:123"
+  *   - "nro: ABC" tai "nro:ABC"
+  *   - "A123" (3-4 merkkinen koodi)
+  */
  window.parseMessage = () => {
  const msg = document.getElementById('msgInput').value.trim();
  if (!msg) return;
@@ -283,44 +400,57 @@ onclick="window.deleteEntry('${r.id}')">X</button>
  const todayStr = String(today.getDate()).padStart(2,'0') + '.' + 
 String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  
- // Päivämäärä (tänään, huomenna, tai pp.kk.yyyy)
+ // ===== PÄIVÄMÄÄRÄ =====
  let date = '';
- if (msg.toLowerCase().includes('tänään')) {
+ const msgLower = msg.toLowerCase();
+ if (msgLower.includes('tänään')) {
  date = todayStr;
- } else if (msg.toLowerCase().includes('huomenna')) {
+ } else if (msgLower.includes('huomenna')) {
  const tomorrow = new Date(today);
  tomorrow.setDate(tomorrow.getDate() + 1);
  date = String(tomorrow.getDate()).padStart(2,'0') + '.' + 
 String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  } else {
- const dateMatch = msg.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+ const dateMatch = msg.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/);
  if (dateMatch) date = dateMatch[0];
  }
  
- // Aika (hh:mm)
- const timeMatch = msg.match(/(\d{1,2}):(\d{2})/);
+ // ===== AIKA =====
+ const timeMatch = msg.match(/\b(\d{1,2}):(\d{2})\b/);
  const time = timeMatch ? timeMatch[0] : '';
  
- // Hinta (numero€ tai numero,xx€)
+ // ===== HINTA =====
  const priceMatch = msg.match(/([\d,]+)\s*€/);
  const price = priceMatch ? priceMatch[1].replace(',', '.') : '';
  
- // Reitti (sanoista "mistä", "mihin", "-", "->")
+ // ===== REITTI =====
  let from = '', to = '';
- const routeMatch = msg.match(/mistä[:\s]*([^\n]*?)(?:mihin|->|-)/i);
- const toMatch = msg.match(/(?:mihin|->|-)[:\s]*([^\n]*?)(?:\n|€|hinta|lasku|laskut)/i);
+ const routeMatch = msg.match(/mistä[:\s]+([^\n]*?)(?=mihin|->|$)/i);
+ const toMatch = msg.match(/(?:mihin|->)[:\s]*([^\n]*?)(?=\n|€|lasku|$)/i);
  if (routeMatch) from = routeMatch[1].trim();
  if (toMatch) to = toMatch[1].trim();
  
- // Matkustaja ja puhelin (luvut jotka muistuttavat puhelinnumerosta)
- const phoneMatch = msg.match(/(\d{9,})/);
+ // ===== PUHELIN =====
+ const phoneMatch = msg.match(/\b(\d{9,})\b/);
  const phone = phoneMatch ? phoneMatch[1] : '';
  
- // Laskutusosapuoli (sanoista "lasku", "laskutus", "maksaja")
- const billingMatch = msg.match(/(?:lasku|laskutus|maksaja)[:\s]*([^\n]*?)(?:\n|€)/i);
+ // ===== LASKUTUSOSAPUOLI =====
+ const billingMatch = msg.match(/(?:lasku|laskutus|maksaja)[:\s]*([^\n]*?)(?=\n|€|$)/i);
  const billing = billingMatch ? billingMatch[1].trim() : '';
  
- // Aseta kentät
+ // ===== AUTO - UUSI TUNNISTUS (GEMININ KORJAUS) =====
+ // Etsii muotoja: "auto: 123", "nro: ABC", tai "A123" tyyppisiä koodeja
+ let car = '';
+ const autoMatch = msg.match(/(?:auto|nro)[:\s]*(\w+)/i);
+ if (autoMatch) {
+ car = autoMatch[1].trim();
+ } else {
+ // Jos "auto:" ei löydy, etsii 3-4 merkkistä koodia (esim. "SMB", "A123")
+ const codeMatch = msg.match(/\b([A-Z0-9]{3,4})\b/);
+ if (codeMatch) car = codeMatch[1];
+ }
+ 
+ // ===== ASETA KENTÄT =====
  if (date) document.getElementById('inPvm').value = date;
  if (time) document.getElementById('inKlo').value = time;
  if (price) document.getElementById('inHinta').value = price;
@@ -328,20 +458,28 @@ String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  if (to) document.getElementById('inTo').value = to;
  if (phone) document.getElementById('inPuhelin').value = phone;
  if (billing) document.getElementById('inLasku').value = billing;
+ if (car) document.getElementById('inAuto').value = car;
  };
  
- // ===== APUFUNKTIO: Suomalaisen päivämäärän muuntaminen Date-objektiksi =====
  function parseFinnishDate(dateStr) {
  if (!dateStr) return null;
  const parts = dateStr.split('.');
  if (parts.length !== 3) return null;
- return new Date(parts[2], parts[1] - 1, parts[0]);
+ 
+ const day = parseInt(parts[0], 10);
+ const month = parseInt(parts[1], 10);
+ const year = parseInt(parts[2], 10);
+ 
+ if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+ if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+ 
+ return new Date(year, month - 1, day);
  }
  
- // ===== CSV EXPORT FUNCTIONS =====
  window.openExportModal = (mode) => {
  exportMode = mode;
  document.getElementById('exportModal').classList.add('active');
+ document.getElementById('exportErrorMsg').style.display = 'none';
  document.getElementById('singleDateField').style.display = 'none';
  document.getElementById('rangeStartField').style.display = 'none';
  document.getElementById('rangeEndField').style.display = 'none';
@@ -359,43 +497,99 @@ String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  });
  
  window.performExport = () => {
+ try {
  const mode = document.getElementById('exportMode').value;
  let filtered = [...currentLogs];
+ const errorDiv = document.getElementById('exportErrorMsg');
  
  const today = new Date();
  today.setHours(0,0,0,0);
- const todayStr = String(today.getDate()).padStart(2,'0') + '.' + String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
+ const todayStr = String(today.getDate()).padStart(2,'0') + '.' + 
+String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  
  if (exportMode === 'all') {
- // Ei suodatusta
+ // Kaikki data
  } else if (mode === 'today') {
  filtered = filtered.filter(r => r.date === todayStr);
  } else if (mode === 'single') {
  const targetDate = document.getElementById('singleDate').value;
+ if (!targetDate) {
+ errorDiv.innerHTML = `<div class="error-msg">⚠️ Anna päivämäärä</div>`;
+ errorDiv.style.display = 'block';
+ return;
+ }
+ if (!validateFinnishDate(targetDate)) {
+ errorDiv.innerHTML = `<div class="error-msg">⚠️ Virheellinen päivämäärä (pp.kk.yyyy)</div>`;
+ errorDiv.style.display = 'block';
+ return;
+ }
  filtered = filtered.filter(r => r.date === targetDate);
  } else if (mode === 'range') {
- const start = parseFinnishDate(document.getElementById('rangeStart').value);
- const end = parseFinnishDate(document.getElementById('rangeEnd').value);
+ const startStr = document.getElementById('rangeStart').value;
+ const endStr = document.getElementById('rangeEnd').value;
+ 
+ if (!startStr || !endStr) {
+ errorDiv.innerHTML = `<div class="error-msg">⚠️ Anna molemmat päivämäärät</div>`;
+ errorDiv.style.display = 'block';
+ return;
+ }
+ 
+ const start = parseFinnishDate(startStr);
+ const end = parseFinnishDate(endStr);
+ 
+ if (!start || !end) {
+ errorDiv.innerHTML = `<div class="error-msg">⚠️ Virheelliset päivämäärät (pp.kk.yyyy)</div>`;
+ errorDiv.style.display = 'block';
+ return;
+ }
+ 
+ if (start > end) {
+ errorDiv.innerHTML = `<div class="error-msg">⚠️ Alkupäivä on loppupäivää jälkeen</div>`;
+ errorDiv.style.display = 'block';
+ return;
+ }
  
  filtered = filtered.filter(r => {
  const current = parseFinnishDate(r.date);
- if (!current || !start || !end) return false;
+ if (!current) return false;
  return current >= start && current <= end;
  });
  }
  
+ if (filtered.length === 0) {
+ errorDiv.innerHTML = `<div class="error-msg">⚠️ Ei tietoja annetulle aikavälille</div>`;
+ errorDiv.style.display = 'block';
+ return;
+ }
+ 
  generateCSV(filtered);
  closeExportModal();
+ } catch (error) {
+ console.error("Exportvirhe:", error);
+ const errorDiv = document.getElementById('exportErrorMsg');
+ errorDiv.innerHTML = `<div class="error-msg">⚠️ Virhe: ${error.message}</div>`;
+ errorDiv.style.display = 'block';
+ }
  };
  
+ /* ===== CSV GENEROINTI =====
+  * Sisältää Auto-sarakkeen ja on yhdenmukainen tilaaja-CSV:n kanssa.
+  */
  function generateCSV(rows) {
- // Lisätty BOM-tunniste Exceliä varten ja varmistettu kenttien olemassaolo
+ try {
  let csv = "\uFEFFPäivä;Aika;Auto;Reitti (Mistä-Mihin);Matkustaja;Puhelin;Tilaaja;Hinta;Lasku;Huomio;Poikkeama\n";
+ 
  rows.forEach(r => {
- const from = r.from || '-';
- const to = r.to || '-';
+ const from = (r.from || '').replace(/;/g, ' ');
+ const to = (r.to || '').replace(/;/g, ' ');
  const route = `${from} → ${to}`;
- csv += `${r.date || ''};${r.time || ''};${r.car || ''};${route};${r.customer || ''};${r.phone || ''};${r.orderer || ''};${r.price || '0'};${r.billing || ''};${r.notes || ''};${r.deviation || ''}\n`;
+ 
+ const sanitize = (val) => {
+ if (!val) return '';
+ return String(val).replace(/;/g, ',').replace(/"/g, '').trim();
+ };
+ 
+ csv += `${sanitize(r.date)};${sanitize(r.time)};${sanitize(r.car)};${sanitize(route)};${sanitize(r.customer)};${sanitize(r.phone)};${sanitize(r.orderer)};${sanitize(r.price || '0')};${sanitize(r.billing)};${sanitize(r.notes)};${sanitize(r.deviation)}\n`;
  });
  
  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -404,21 +598,49 @@ String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  link.href = url;
  link.download = `kuljetuskirja_vienti_${new Date().toISOString().split('T')[0]}.csv`;
  link.click();
+ 
+ setTimeout(() => URL.revokeObjectURL(url), 100);
+ } catch (error) {
+ showError("CSV-generointivirhe: " + error.message);
+ console.error(error);
+ }
  }
  
+ /* ===== TILAAJA-CSV VIENTI =====
+  * Suodattelee: vain tilaukset joissa auto-numero EI ole pelkkiä numeroita
+  * Regex: /^\d+$/ = pelkkiä numeroita. !/^\d+$/ = NOT pelkkiä numeroita
+  * Esimerkki: "123" pois, "SMB" ja "A456" sisään.
+  */
  window.exportSubscriberCSV = () => {
+ try {
  const filtered = currentLogs.filter(r => {
  const car = (r.car || "").toString().trim();
  return car !== "" && !/^\d+$/.test(car);
  });
+ 
+ if (filtered.length === 0) {
+ showError("Ei tilaaja-aineistoa");
+ return;
+ }
+ 
  let csv = "\uFEFFPäivä;Aika;Mistä;Mihin;Kuka kyydissä;Ketä laskutetaan;Summa;Auto;Huomio\n";
  filtered.forEach(r => { 
- csv += `${r.date || ''};${r.time || ''};${r.from || ''};${r.to || ''};${r.customer || ''};${r.billing || ''};${r.price || ''};${r.car || ''};${r.notes || ''}\n`; 
+ const sanitize = (val) => String(val || '').replace(/;/g, ',').replace(/"/g, '').trim();
+ csv += `${sanitize(r.date)};${sanitize(r.time)};${sanitize(r.from)};${sanitize(r.to)};${sanitize(r.customer)};${sanitize(r.billing)};${sanitize(r.price)};${sanitize(r.car)};${sanitize(r.notes)}\n`; 
  });
+ 
+ const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+ const url = URL.createObjectURL(blob);
  const link = document.createElement("a");
- link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+ link.href = url;
  link.download = "tilaajan_erittely.csv"; 
  link.click();
+ 
+ setTimeout(() => URL.revokeObjectURL(url), 100);
+ } catch (error) {
+ showError("Tilaaja-CSV virhe: " + error.message);
+ console.error(error);
+ }
  };
  
  document.getElementById('btnSetSMB').onclick = () => { 
