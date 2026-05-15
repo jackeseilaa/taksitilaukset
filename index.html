@@ -4,7 +4,7 @@
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, 
 user-scalable=no">
- <title>Kuljetuskirja V37.27</title>
+ <title>Kuljetuskirja V37.29</title>
  <link href="https://fonts.googleapis.com/css2?
 family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
@@ -75,7 +75,7 @@ border: 1px solid var(--border); }
 var(--accent); background: #000; text-transform: uppercase; font-weight: 900; }
  td { padding: 12px 10px; border-bottom: 1px solid #333; vertical-align: top; }
  
- .price-tag { font-weight: 900; color: var(--price-text); background: var(--price-bg); 
+ .price-tag { font-weight: 900; color: #000000; background: #ff9900; 
 padding: 4px 8px; border-radius: 4px; }
  .action-btn { background: #222; border: 1px solid #444; font-size: 1.1rem; cursor: 
 pointer; color: var(--accent2); padding: 6px 10px; border-radius: 4px; margin-right: 5px; }
@@ -84,7 +84,7 @@ pointer; color: var(--accent2); padding: 6px 10px; border-radius: 4px; margin-ri
  </style>
 </head>
 <body>
-<div class="v-tag">VERSIO 37.27 (Geminin hyväksymä - puhdistettu / ja välilyönnit) (Monirivinen parseMessage: Nimi/Tilaaja/Lasku erottelu, pp.kk täydennys, Huomio)</div>
+<div class="v-tag">VERSIO 37.29 (FINAL - Korjattu msgLower duplikaatti) (FINAL - Päivämäärä ensiöity, Lasku regex fix, Väri-logiikka, Hinnan kontrasti) (Geminin hyväksymä - puhdistettu / ja välilyönnit) (Monirivinen parseMessage: Nimi/Tilaaja/Lasku erottelu, pp.kk täydennys, Huomio)</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()">
@@ -239,6 +239,21 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
  <button class="action-btn del-btn" onclick="window.deleteEntry('${r.id}')">X</button>
  </td>`;
+ 
+ // ===== VÄRI-LOGIIKKA: Tulevat tilaukset vihreä, menneet mustat =====
+ const rowDate = parseFinnishDate(r.date);
+ const isExpired = rowDate && rowDate < today;
+ 
+ if (rowDate && !isExpired) {
+ // TULEVAISUUS: Vihreä pohja, musta teksti
+ tr.style.backgroundColor = '#2a5a2a';
+ tr.style.color = '#00ff00';
+ } else {
+ // MENNYT: Musta pohja, valkoinen teksti
+ tr.style.backgroundColor = '#000000';
+ tr.style.color = '#ffffff';
+ }
+ 
  tbody.appendChild(tr);
  });
  }
@@ -405,8 +420,31 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  const lines = msg.split('\n');
  const msgLower = msg.toLowerCase();
  
- // ===== PÄIVÄMÄÄRÄ =====
+ // ===== PÄIVÄMÄÄRÄ (PARANNETTU LOGIIKKA) =====
+ // PRIORITEETTI: Etsi aina numero ensin!
+ // Jos "Huomenna 28.4" → käytä 28.4, älä laske seuraava päivä!
  let date = '';
+ let foundDate = false;
+ 
+ // pp.kk.yyyy - etsi ENSIN
+ let dateMatch = msg.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/);
+ if (dateMatch) {
+ date = dateMatch[0];
+ foundDate = true;
+ } else {
+ // pp.kk (lisää kuluva vuosi) - etsi toiseksi
+ dateMatch = msg.match(/\b(\d{1,2})\.(\d{1,2})\b/);
+ if (dateMatch) {
+ const day = String(dateMatch[1]).padStart(2,'0');
+ const month = String(dateMatch[2]).padStart(2,'0');
+ const year = today.getFullYear();
+ date = `${day}.${month}.${year}`;
+ foundDate = true;
+ }
+ }
+ 
+ // Jos numeroa ei löytynyt, käytä "tänään" / "huomenna"
+ if (!foundDate) {
  if (msgLower.includes('tänään')) {
  date = todayStr;
  } else if (msgLower.includes('huomenna')) {
@@ -414,20 +452,6 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  tomorrow.setDate(tomorrow.getDate() + 1);
  date = String(tomorrow.getDate()).padStart(2,'0') + '.' + 
 String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
- } else {
- // pp.kk.yyyy
- let dateMatch = msg.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/);
- if (dateMatch) {
- date = dateMatch[0];
- } else {
- // pp.kk (lisää kuluva vuosi - KORJAUS!)
- dateMatch = msg.match(/\b(\d{1,2})\.(\d{1,2})\b/);
- if (dateMatch) {
- const day = String(dateMatch[1]).padStart(2,'0');
- const month = String(dateMatch[2]).padStart(2,'0');
- const year = today.getFullYear();
- date = `${day}.${month}.${year}`;
- }
  }
  }
  
@@ -533,13 +557,14 @@ String(tomorrow.getMonth()+1).padStart(2,'0') + '.' + tomorrow.getFullYear();
  }
  }
  
- // ===== LASKU / MAKSAJA - Parannettu (puhdista "/" ja välilyönnit!) =====
+ // ===== LASKU / MAKSAJA - Parannettu (KORJAUS: laskulle ENSIN!) =====
  let invoiceParty = '';
  
- // Etsii "Lasku" tai "Laskulle" osion - salli "/" ja välilyönnit alussa!
+ // TÄRKEÄ: "laskulle" ennen "lasku" jotta pitempi alternative matchaa ensin!
+ // Word boundary \b estää "lasku" matchaamisen "laskulle":sta
  for (let i = 0; i < lines.length; i++) {
  const trimmedLine = lines[i].trim();
- const match = trimmedLine.match(/^[\s\/]*(lasku|laskulle)[:\s\/]*(.*)$/i);
+ const match = trimmedLine.match(/^[\s\/]*(laskulle|lasku)\b[:\s\/]*(.*)$/i);
  if (match) {
  let invoiceLines = [];
  // Lisää saman rivin loppuosa - puhdista "/" ja välilyönnit!
