@@ -76,7 +76,7 @@
 </div>
 <div class="btn-row">
  <button class="btn-add" id="btnSave">TALLENNA TILAUS</button>
- <button class="btn-csv export-all" onclick="generateCSV(currentLogs)">LATAA KOKO CSV</button>
+ <button class="btn-csv export-all" onclick="window.downloadAllCSV()">LATAA KOKO CSV</button>
  <button class="btn-csv export-date" id="btnSetSMB" style="background: #2a4a2a;">ASETA SMB TÄNÄÄN</button>
  <button class="btn-csv export-date" onclick="openExportModal('date')">LATAA PÄIVÄ/AIKAVÄLI</button>
  <button class="btn-csv export-subscriber" onclick="exportSubscriberCSV()">LATAA TILAAJAN CSV</button>
@@ -646,6 +646,14 @@
  document.getElementById('btnSetSMB').onclick = () => { 
  document.getElementById('inAuto').value = "SMB"; 
  document.getElementById('inPvm').value = new Date().toLocaleDateString('fi-FI'); 
+ };
+ window.downloadAllCSV = () => {
+ console.log("📥 Ladataan KAIKKI CSV, currentLogs.length =", currentLogs.length);
+ if (!currentLogs || currentLogs.length === 0) {
+ alert('⚠️ Ei dataa ladattavaksi');
+ return;
+ }
+ generateCSV(currentLogs);
  };
  document.addEventListener('DOMContentLoaded', () => {
  const now = new Date();
