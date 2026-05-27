@@ -54,7 +54,7 @@
  </style>
 </head>
 <body>
-<div class="v-tag">V37.33 | Päivitetty: 27.05.2026 klo 19:30</div>
+<div class="v-tag" id="versionTag">V37.33</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -647,6 +647,12 @@
  document.getElementById('inAuto').value = "SMB"; 
  document.getElementById('inPvm').value = new Date().toLocaleDateString('fi-FI'); 
  };
+ document.addEventListener('DOMContentLoaded', () => {
+ const now = new Date();
+ const dateStr = String(now.getDate()).padStart(2,'0') + '.' + String(now.getMonth()+1).padStart(2,'0') + '.' + now.getFullYear();
+ const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+ document.getElementById('versionTag').textContent = `V37.33 | ${dateStr} klo ${timeStr}`;
+ });
 </script>
 </body>
 </html>
