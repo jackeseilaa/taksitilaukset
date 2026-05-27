@@ -113,6 +113,9 @@
  </div>
  </div>
 </div>
+<div style="text-align: center; color: #c8f050; font-size: 0.9rem; margin-bottom: 10px; font-weight: bold;">
+ 📊 Ladattu: <span id="dataCount">0</span> tilausta Firestore:sta
+</div>
 <div class="table-wrapper">
  <table>
  <thead><tr><th>AIKA</th><th>AUTO</th><th>REITTI</th><th>MATKUSTAJA</th><th>PUHELIN</th><th>TILAAJA</th><th>HINTA</th><th>LASKU</th><th>HUOMIO</th><th>POIKKEAMA</th><th>TOIMINNOT</th></tr></thead>
@@ -150,6 +153,7 @@
  console.log("🔧 Firestore listener asetettu, odotetaan dataa...");
  function renderTable() {
  console.log("🎨 renderTable() kutsuttu, currentLogs.length =", currentLogs.length);
+ document.getElementById('dataCount').textContent = currentLogs.length;
  const today = new Date();
  const tbody = document.getElementById('logs');
  tbody.innerHTML = '';
