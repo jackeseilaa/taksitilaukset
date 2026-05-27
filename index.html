@@ -619,7 +619,7 @@
  }
  return `+${cleaned}`;
  };
- csv += `${sanitize(r.date)};${sanitize(r.time)};${sanitize(r.car)};${sanitize(route)};${sanitize(r.customer)};"${formatPhone(r.phone)}";${sanitize(r.orderer)};${sanitize(r.price || '0')};${sanitize(r.billing)};${sanitize(r.notes)};${sanitize(r.deviation)}\n`;
+ csv += `${sanitize(r.date)};${sanitize(r.time)};${sanitize(r.car)};${sanitize(route)};${sanitize(r.customer)};"${formatPhone(r.phone)}";${sanitize(r.orderer)};${sanitize(r.price || '0')}€;${sanitize(r.billing)};${sanitize(r.notes)};${sanitize(r.deviation)}\n`;
  });
  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
  const url = URL.createObjectURL(blob);
