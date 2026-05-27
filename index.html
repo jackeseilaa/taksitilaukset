@@ -233,9 +233,9 @@ String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
  tr.innerHTML = `
  <td><b>${escapeHtml(r.date || '-')}</b><br>${escapeHtml(r.time || '-')}</td>
  <td>${escapeHtml(r.car || '-')}</td>
- <td>${escapeHtml(r.from || '-')}<br>${escapeHtml(r.to || '-')}</td>
+ <td>${r.from ? \<a href="https://maps.google.com/?q=${encodeURIComponent(r.from)}">${escapeHtml(r.from)}</a>` : '-'}<br>${r.to ? `<a href="https://maps.google.com/?q=${encodeURIComponent(r.to)}">${escapeHtml(r.to)}</a>` : '-'}</td>
  <td>${escapeHtml(r.customer || '-')}</td>
- <td>${escapeHtml(r.phone || '-')}</td>
+ <td><td>${r.phone ? \<a href="tel:${r.phone}">${escapeHtml(r.phone)}</a>` : '-'}</td>`
  <td>${escapeHtml(r.orderer || '-')}</td>
  <td><span class="price-tag">${escapeHtml(r.price || '0')}€</span></td>
  <td>${escapeHtml(r.billing || '-')}</td>
