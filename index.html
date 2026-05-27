@@ -587,7 +587,17 @@
  function generateCSV(rows) {
  try {
  let csv = "\uFEFFPäivä;Aika;Auto;Reitti (Mistä-Mihin);Matkustaja;Puhelin;Tilaaja;Hinta;Lasku;Huomio;Poikkeama\n";
- rows.forEach(r => {
+ 
+ // Järjestä rows päivämäärän + ajan mukaan (vanhin ensin)
+ const sorted = [...rows].sort((a, b) => {
+ const dateA = parseFinnishDate(a.date);
+ const dateB = parseFinnishDate(b.date);
+ if (!dateA || !dateB) return 0;
+ if (dateA.getTime() !== dateB.getTime()) return dateA - dateB;
+ return (a.time || '').localeCompare(b.time || '');
+ });
+ 
+ sorted.forEach(r => {
  const from = (r.from || '').replace(/;/g, ' ');
  const to = (r.to || '').replace(/;/g, ' ');
  const route = `${from} → ${to}`;
