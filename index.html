@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.36</title>
+ <title>Kuljetuskirja V37.37</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -57,7 +57,14 @@
  </style>
 </head>
 <body>
-<div class="v-tag">V37.36 | Päivitetty: 27.05.2026</div>
+<div id="auth-overlay" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000;color:#fff;flex-direction:column;gap:16px;padding:20px;text-align:center;">
+    <h1 style="font-family:'Syne',sans-serif;color:#c8f050;letter-spacing:2px;">KULJETUSKIRJA</h1>
+    <p style="color:#aaa;margin:0;">Kirjaudu sisään jatkaaksesi</p>
+    <button id="btnLogin" style="padding:14px 28px;font-size:16px;font-weight:700;border:none;border-radius:8px;background:#c8f050;color:#000;cursor:pointer;font-family:'DM Mono',monospace;">Kirjaudu Googlella</button>
+    <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
+</div>
+<div id="app-root" style="display:none;">
+<div class="v-tag">V37.37 | Päivitetty: 01.07.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -128,6 +135,7 @@
 <script type="module">
  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
  import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+ import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
  const firebaseConfig = { 
  apiKey: "AIzaSyBVPk5FmqbVmirWpjnTQswfNDoUK2SoWzs", 
  authDomain: "jsailing-f716c.firebaseapp.com", 
@@ -135,23 +143,58 @@
  storageBucket: "jsailing-f716c.firebasestorage.app", 
  appId: "1:543523103696:web:439a312efa6aec398a8fd5" 
  };
- const db = getFirestore(initializeApp(firebaseConfig));
+ const app = initializeApp(firebaseConfig);
+ const db = getFirestore(app);
+ const auth = getAuth(app);
+ const ALLOWED_EMAIL = "jacke.seilaa@gmail.com";
  let currentLogs = [];
  let editId = null;
  let exportMode = 'today';
- window.addEventListener('DOMContentLoaded', () => {
- const today = new Date();
- const todayStr = String(today.getDate()).padStart(2,'0') + '.' + String(today.getMonth()+1).padStart(2,'0') + '.' + today.getFullYear();
- document.getElementById('inPvm').value = todayStr;
+ let unsubSnapshot = null;
+
+ // ===== AUTENTIKOINTI =====
+ document.getElementById('btnLogin')?.addEventListener('click', async () => {
+     const provider = new GoogleAuthProvider();
+     try {
+         await signInWithPopup(auth, provider);
+     } catch (e) {
+         if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+             try { await signInWithRedirect(auth, provider); }
+             catch (e2) { document.getElementById('auth-error').textContent = 'Kirjautuminen epäonnistui: ' + e2.message; }
+         } else {
+             document.getElementById('auth-error').textContent = 'Kirjautuminen epäonnistui: ' + e.message;
+         }
+     }
  });
- onSnapshot(collection(db, "taksitulot"), (snap) => {
- console.log("✅ Firestore-data vastaanotettu, rivejä:", snap.docs.length);
- currentLogs = snap.docs.map(d => ({id: d.id, ...d.data()}));
- console.log("📋 currentLogs päivitetty, yhteensä:", currentLogs.length, "tilausta");
- renderTable();
- }, (error) => {
- console.error("❌ Firestore-virhe:", error);
- showError("Tietokantavirhe: " + error.message);
+
+ getRedirectResult(auth).catch((e) => {
+     if (e && e.code && e.code !== 'auth/no-current-user') {
+         document.getElementById('auth-error').textContent = 'Kirjautuminen epäonnistui: ' + e.message;
+     }
+ });
+
+ onAuthStateChanged(auth, (user) => {
+     if (user && user.email === ALLOWED_EMAIL) {
+         document.getElementById('auth-overlay').style.display = 'none';
+         document.getElementById('app-root').style.display = 'block';
+         if (!unsubSnapshot) {
+             unsubSnapshot = onSnapshot(collection(db, "taksitulot"), (snap) => {
+                 console.log("✅ Firestore-data vastaanotettu, rivejä:", snap.docs.length);
+                 currentLogs = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                 renderTable();
+             }, (error) => {
+                 console.error("❌ Firestore-virhe:", error);
+                 showError("Tietokantavirhe: " + error.message);
+             });
+         }
+     } else if (user && user.email !== ALLOWED_EMAIL) {
+         signOut(auth);
+         document.getElementById('auth-error').textContent = 'Pääsy estetty. Vain ' + ALLOWED_EMAIL + ' voi kirjautua.';
+     } else {
+         document.getElementById('auth-overlay').style.display = 'flex';
+         document.getElementById('app-root').style.display = 'none';
+         if (unsubSnapshot) { unsubSnapshot(); unsubSnapshot = null; }
+     }
  });
  console.log("🔧 Firestore listener asetettu, odotetaan dataa...");
  function renderTable() {
@@ -673,6 +716,7 @@
  generateCSV(currentLogs);
  };
 </script>
+</div>
 </body>
 </html>
-<!-- Updated Wed May 27 07:59:23 UTC 2026 -->
+<!-- Updated Wed Jul 01 auth-added -->
