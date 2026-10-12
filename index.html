@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.39</title>
+ <title>Kuljetuskirja V37.40</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -64,7 +64,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.39 | Päivitetty: 12.10.2026</div>
+<div class="v-tag">V37.40 | Päivitetty: 12.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -89,7 +89,7 @@
  <button class="btn-csv export-all" onclick="window.downloadAllCSV()">LATAA KOKO CSV</button>
  <button class="btn-csv export-date" id="btnSetSMB" style="background: #2a4a2a;">ASETA SMB TÄNÄÄN</button>
  <button class="btn-csv export-date" onclick="openExportModal('date')">LATAA PÄIVÄ/AIKAVÄLI</button>
- <button class="btn-csv export-subscriber" onclick="exportSubscriberCSV()">LATAA TILAAJAN CSV</button>
+ <button class="btn-csv export-subscriber" onclick="exportSubscriberCSV()">LATAA LASKUTETTAVAT CSV</button>
  <button class="btn-csv" id="btnClear" onclick="clearForm()" style="background: #3a2a2a;">TYHJENNÄ</button>
  <button class="btn-cancel" id="btnCancel" onclick="cancelEdit()">PERUUTA MUOKKAUS</button>
 </div>
@@ -719,11 +719,11 @@
  window.exportSubscriberCSV = () => {
  try {
  const filtered = currentLogs.filter(r => {
- const car = (r.car || "").toString().trim();
- return car !== "" && !/^\d+$/.test(car);
+ const bill = (r.billing || "").toString().trim();
+ return bill !== "" && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(bill);
  });
  if (filtered.length === 0) {
- showError("Ei tilaaja-aineistoa");
+ showError("Ei laskutettavia kyytejä");
  return;
  }
  let csv = "\uFEFFPäivä;Aika;Mistä;Mihin;Kuka kyydissä;Ketä laskutetaan;Summa;Auto;Huomio\n";
