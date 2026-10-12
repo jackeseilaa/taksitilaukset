@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.38</title>
+ <title>Kuljetuskirja V37.39</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -64,7 +64,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.38 | Päivitetty: 05.07.2026</div>
+<div class="v-tag">V37.39 | Päivitetty: 12.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -147,6 +147,37 @@
  const db = getFirestore(app);
  const auth = getAuth(app);
  const ALLOWED_EMAIL = "jacke.seilaa@gmail.com";
+ // Google Sheets -synkkaus (Apps Script -web-sovelluksen osoite). Tyhjä = synkkaus pois päältä.
+ const SHEET_URL = "https://script.google.com/macros/s/AKfycbyrAQOUO0a1arB09H4ItiCJTgCGD2-cOpIXiWYg-B8A54D4A1KLPoNy-paFZPEDTC3C/exec";
+ const SYNC_KEY = "kk_sheet_queue";
+ function loadQueue() { try { return JSON.parse(localStorage.getItem(SYNC_KEY) || "[]"); } catch (e) { return []; } }
+ function saveQueue(q) { try { localStorage.setItem(SYNC_KEY, JSON.stringify(q)); } catch (e) {} }
+ let syncRunning = false;
+ async function flushSheetQueue() {
+ if (!SHEET_URL || syncRunning || !auth.currentUser) return;
+ syncRunning = true;
+ try {
+ let q = loadQueue();
+ while (q.length) {
+ const item = q[0];
+ let res;
+ try {
+ const idToken = await auth.currentUser.getIdToken();
+ const r = await fetch(SHEET_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: item.action, idToken: idToken, order: item.order }) });
+ res = await r.json();
+ } catch (e) { res = { ok: false, error: e.message }; }
+ if (!res.ok) { showError("Taulukkoon tallennus epäonnistui (yritetään uudelleen): " + (res.error || "ei yhteyttä")); break; }
+ q = loadQueue(); q.shift(); saveQueue(q);
+ }
+ } finally { syncRunning = false; }
+ }
+ function queueSheet(action, order) {
+ if (!SHEET_URL) return;
+ const q = loadQueue();
+ q.push({ action: action, order: order });
+ saveQueue(q);
+ flushSheetQueue();
+ }
  let currentLogs = [];
  let editId = null;
  let exportMode = 'today';
@@ -177,6 +208,7 @@
      if (user && user.email === ALLOWED_EMAIL) {
          document.getElementById('auth-overlay').style.display = 'none';
          document.getElementById('app-root').style.display = 'block';
+         flushSheetQueue();
          if (!unsubSnapshot) {
              unsubSnapshot = onSnapshot(collection(db, "taksitulot"), (snap) => {
                  console.log("✅ Firestore-data vastaanotettu, rivejä:", snap.docs.length);
@@ -288,10 +320,13 @@
  return;
  }
  if (editId) { 
- await updateDoc(doc(db, "taksitulot", editId), data); 
+ const savedId = editId;
+ await updateDoc(doc(db, "taksitulot", savedId), data); 
  cancelEdit(); 
+ queueSheet("upsert", Object.assign({ id: savedId }, data));
  } else { 
- await addDoc(collection(db, "taksitulot"), data); 
+ const ref = await addDoc(collection(db, "taksitulot"), data); 
+ queueSheet("upsert", Object.assign({ id: ref.id }, data));
  }
  clearForm();
  } catch (error) {
@@ -341,6 +376,7 @@
  if(confirm("Poista tilaus?")) {
  try {
  await deleteDoc(doc(db, "taksitulot", id));
+ queueSheet("delete", { id: id });
  } catch (error) {
  showError("Poistamisvirhe: " + error.message);
  console.error(error);
