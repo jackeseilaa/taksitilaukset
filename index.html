@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.41</title>
+ <title>Kuljetuskirja V37.42</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -64,7 +64,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.41 | Päivitetty: 12.10.2026</div>
+<div class="v-tag">V37.42 | Päivitetty: 12.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -89,7 +89,7 @@
  <button class="btn-csv export-all" onclick="window.downloadAllCSV()">LATAA KOKO CSV</button>
  <button class="btn-csv export-date" id="btnSetSMB" style="background: #2a4a2a;">ASETA SMB TÄNÄÄN</button>
  <button class="btn-csv export-date" onclick="openExportModal('date')">LATAA PÄIVÄ/AIKAVÄLI</button>
- <button class="btn-csv export-subscriber" onclick="exportSubscriberCSV()">LATAA LASKUTETTAVAT CSV</button>
+ <button class="btn-csv export-subscriber" onclick="exportSubscriberCSV()">LATAA LASKUTETTAVAT (EXCEL)</button>
  <button class="btn-csv" id="btnClear" onclick="clearForm()" style="background: #3a2a2a;">TYHJENNÄ</button>
  <button class="btn-cancel" id="btnCancel" onclick="cancelEdit()">PERUUTA MUOKKAUS</button>
 </div>
@@ -735,18 +735,44 @@
  showError("Ei laskutettavia kyytejä kuukaudelle " + ans.trim());
  return;
  }
- let csv = "\uFEFFPäivä;Aika;Mistä;Mihin;Kuka kyydissä;Ketä laskutetaan;Summa;Auto;Huomio\n";
- filtered.forEach(r => { 
- const sanitize = (val) => String(val || '').replace(/;/g, ',').replace(/"/g, '').trim();
- csv += `${sanitize(r.date)};${sanitize(r.time)};${sanitize(r.from)};${sanitize(r.to)};${sanitize(r.customer)};${sanitize(r.billing)};${sanitize(r.price)};${sanitize(r.car)};${sanitize(r.notes)}\n`; 
- });
- const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+ const tmin = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? (+m[1]) * 60 + (+m[2]) : 0; };
+ const fmtT = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? m[1].padStart(2, '0') + ':' + m[2] : String(t || ''); };
+ filtered.sort((a, b) => (parseFinnishDate(a.date) - parseFinnishDate(b.date)) || (tmin(a.time) - tmin(b.time)));
+ const head = ['Päivä', 'Aika', 'Mistä', 'Mihin', 'Kuka kyydissä', 'Ketä laskutetaan', 'Summa €', 'Auto', 'Huomio'];
+ const body = filtered.map(r => [
+ String(r.date || ''), fmtT(r.time), String(r.from || ''), String(r.to || ''), String(r.customer || ''),
+ String(r.billing || ''), parseFloat(String(r.price || '0').replace(',', '.')) || 0, String(r.car || ''), String(r.notes || '')
+ ]);
+ const fname = `laskutettavat_${selY}-${String(selM).padStart(2, "0")}`;
+ const saveBlob = (blob, name) => {
  const url = URL.createObjectURL(blob);
  const link = document.createElement("a");
- link.href = url;
- link.download = `laskutettavat_${selY}-${String(selM).padStart(2, "0")}.csv`; 
- link.click();
+ link.href = url; link.download = name; link.click();
  setTimeout(() => URL.revokeObjectURL(url), 100);
+ };
+ const csvFallback = () => {
+ const sanitize = (val) => String(val == null ? '' : val).replace(/;/g, ',').replace(/"/g, '').trim();
+ let csv = "\uFEFF" + head.join(';') + "\n";
+ body.forEach(row => { csv += row.map(sanitize).join(';') + "\n"; });
+ saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), fname + '.csv');
+ };
+ const makeXlsx = () => {
+ const ws = XLSX.utils.aoa_to_sheet([head, ...body]);
+ const all = [head, ...body];
+ ws['!cols'] = head.map((_, c) => ({ wch: Math.min(60, Math.max(8, ...all.map(row => String(row[c] == null ? '' : row[c]).length)) + 2) }));
+ const total = body.reduce((a, row) => a + row[6], 0);
+ XLSX.utils.sheet_add_aoa(ws, [['', '', '', '', '', 'Yhteensä', total]], { origin: -1 });
+ const wb = XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb, ws, 'Laskutettavat');
+ const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+ saveBlob(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fname + '.xlsx');
+ };
+ if (window.XLSX) { makeXlsx(); return; }
+ const sc = document.createElement('script');
+ sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+ sc.onload = () => { try { makeXlsx(); } catch (e) { console.error(e); csvFallback(); } };
+ sc.onerror = () => csvFallback();
+ document.head.appendChild(sc);
  } catch (error) {
  showError("Tilaaja-CSV virhe: " + error.message);
  console.error(error);
