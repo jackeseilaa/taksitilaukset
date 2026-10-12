@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.42</title>
+ <title>Kuljetuskirja V37.43</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -64,7 +64,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.42 | Päivitetty: 12.10.2026</div>
+<div class="v-tag">V37.43 | Päivitetty: 12.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -229,6 +229,8 @@
      }
  });
  console.log("🔧 Firestore listener asetettu, odotetaan dataa...");
+ const RIDE_GRACE_MIN = 60;
+ setInterval(() => { if (currentLogs && currentLogs.length) renderTable(); }, 60000);
  function renderTable() {
  console.log("🎨 renderTable() kutsuttu, currentLogs.length =", currentLogs.length);
  document.getElementById('dataCount').textContent = currentLogs.length;
@@ -264,7 +266,13 @@
  <button class="action-btn del-btn" onclick="window.deleteEntry('${r.id}')">X</button>
  </td>`;
  const rowDate = parseFinnishDate(r.date);
- const isExpired = rowDate && rowDate < today;
+ let isExpired = rowDate && rowDate < today;
+ const tm = String(r.time || '').match(/(\d{1,2})[.:](\d{2})/);
+ if (rowDate && !isExpired && tm) {
+ // Korostus pysyy kunnes alkamisajasta on kulunut RIDE_GRACE_MIN (keikka voi olla kesken)
+ const startMs = new Date(rowDate.getFullYear(), rowDate.getMonth(), rowDate.getDate(), +tm[1], +tm[2]).getTime();
+ if (Date.now() > startMs + RIDE_GRACE_MIN * 60000) isExpired = true;
+ }
  if (rowDate && !isExpired) {
  tr.style.backgroundColor = '#2a5a2a';
  tr.style.color = '#00ff00';
