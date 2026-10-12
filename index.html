@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.40</title>
+ <title>Kuljetuskirja V37.41</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -64,7 +64,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.40 | Päivitetty: 12.10.2026</div>
+<div class="v-tag">V37.41 | Päivitetty: 12.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -718,12 +718,21 @@
  }
  window.exportSubscriberCSV = () => {
  try {
+ const now = new Date();
+ const def = String(now.getMonth() + 1).padStart(2, '0') + '.' + now.getFullYear();
+ const ans = prompt('Minkä kuukauden laskutettavat kyydit? (kk.vvvv)', def);
+ if (ans === null) return;
+ const mm = ans.trim().match(/^(\d{1,2})\.(\d{4})$/);
+ if (!mm || +mm[1] < 1 || +mm[1] > 12) { showError("Anna kuukausi muodossa kk.vvvv, esim. " + def); return; }
+ const selM = +mm[1], selY = +mm[2];
  const filtered = currentLogs.filter(r => {
+ const d = parseFinnishDate(r.date);
+ if (!d || d.getMonth() + 1 !== selM || d.getFullYear() !== selY) return false;
  const bill = (r.billing || "").toString().trim();
  return bill !== "" && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(bill);
  });
  if (filtered.length === 0) {
- showError("Ei laskutettavia kyytejä");
+ showError("Ei laskutettavia kyytejä kuukaudelle " + ans.trim());
  return;
  }
  let csv = "\uFEFFPäivä;Aika;Mistä;Mihin;Kuka kyydissä;Ketä laskutetaan;Summa;Auto;Huomio\n";
@@ -735,7 +744,7 @@
  const url = URL.createObjectURL(blob);
  const link = document.createElement("a");
  link.href = url;
- link.download = "tilaajan_erittely.csv"; 
+ link.download = `laskutettavat_${selY}-${String(selM).padStart(2, "0")}.csv`; 
  link.click();
  setTimeout(() => URL.revokeObjectURL(url), 100);
  } catch (error) {
