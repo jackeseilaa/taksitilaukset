@@ -148,7 +148,7 @@
  const auth = getAuth(app);
  const ALLOWED_EMAIL = "jacke.seilaa@gmail.com";
  // Google Sheets -synkkaus (Apps Script -web-sovelluksen osoite). Tyhjä = synkkaus pois päältä.
- const SHEET_URL = "";
+ const SHEET_URL = "https://script.google.com/macros/s/AKfycbyrAQOUO0a1arB09H4ItiCJTgCGD2-cOpIXiWYg-B8A54D4A1KLPoNy-paFZPEDTC3C/exec";
  const SYNC_KEY = "kk_sheet_queue";
  function loadQueue() { try { return JSON.parse(localStorage.getItem(SYNC_KEY) || "[]"); } catch (e) { return []; } }
  function saveQueue(q) { try { localStorage.setItem(SYNC_KEY, JSON.stringify(q)); } catch (e) {} }
