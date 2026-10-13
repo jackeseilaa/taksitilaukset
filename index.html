@@ -448,7 +448,7 @@
  if (klMatch) {
  time = klMatch[1].padStart(2,'0') + ':' + (klMatch[2] || '00');
  } else {
- const noDate = msg.replace(/\b\d{1,2}\.\d{1,2}\.(\d{4})?/g, ' ');
+ const noDate = dateMatch ? msg.replace(dateMatch[0], ' ') : msg;
  const timeMatch = noDate.match(/\b(\d{1,2})[:.](\d{2})\b/);
  if (timeMatch) {
  time = timeMatch[1].padStart(2,'0') + ':' + timeMatch[2];
