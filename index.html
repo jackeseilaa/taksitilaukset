@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.45</title>
+ <title>Kuljetuskirja V37.46</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -64,7 +64,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.45 | Päivitetty: 13.10.2026</div>
+<div class="v-tag">V37.46 | Päivitetty: 13.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -443,9 +443,16 @@
  }
  }
  let time = '';
- const timeMatch = msg.match(/\b(\d{1,2})[:.](\d{2})\b/);
+ // Kellonaika: ensisijaisesti "klo 5", "klo 05.00", "klo 5:30"; muuten h.mm/h:mm, mutta päivämäärää (14.10 / 14.10.2026) ei tulkita kellonajaksi
+ const klMatch = msg.match(/\bklo\.?\s*(\d{1,2})(?:[:.](\d{2}))?(?!\d)/i);
+ if (klMatch) {
+ time = klMatch[1].padStart(2,'0') + ':' + (klMatch[2] || '00');
+ } else {
+ const noDate = msg.replace(/\b\d{1,2}\.\d{1,2}\.(\d{4})?/g, ' ');
+ const timeMatch = noDate.match(/\b(\d{1,2})[:.](\d{2})\b/);
  if (timeMatch) {
  time = timeMatch[1].padStart(2,'0') + ':' + timeMatch[2];
+ }
  }
  let price = '';
  const priceMatch = msg.match(/([\d,]+)\s*(?:€|e(?:\s|$|[^a-z]))/i);
