@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.46</title>
+ <title>Kuljetuskirja V37.47</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -64,7 +64,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.46 | Päivitetty: 13.10.2026</div>
+<div class="v-tag">V37.47 | Päivitetty: 13.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -526,6 +526,8 @@
  }
  }
  }
+ let billPhone = '';
+ billing = billing.replace(/\+?\d[\d\s]{6,}\d/g, (m) => { if (!billPhone) billPhone = m.replace(/\s+/g, ''); return ' '; }).replace(/\s+/g, ' ').trim();
  let invoiceParty = '';
  for (let i = 0; i < lines.length; i++) {
  const trimmedLine = lines[i].trim();
@@ -551,6 +553,16 @@
  invoiceParty = billing;
  }
  break;
+ }
+ }
+ if (!invoiceParty) {
+ for (let i = 0; i < lines.length; i++) {
+ const lm = lines[i].match(/\b(laskulle|laskutetaan)\b[:\s\/]*(.*)$/i);
+ if (lm) {
+ const rest = (lm[2] || '').trim();
+ invoiceParty = (!rest || /^tilaaja/i.test(rest)) ? billing : rest;
+ break;
+ }
  }
  }
  let notes = '';
@@ -584,7 +596,7 @@
  if (from) document.getElementById('inFrom').value = from;
  if (to) document.getElementById('inTo').value = to;
  if (customer) document.getElementById('inNimi').value = customer;
- if (phone) document.getElementById('inPuhelin').value = phone;
+ if (phone || billPhone) document.getElementById('inPuhelin').value = phone || billPhone;
  if (billing) document.getElementById('inTilaaja').value = billing;
  if (invoiceParty) document.getElementById('inLasku').value = invoiceParty;
  if (notes) document.getElementById('inHuomio').value = notes;
