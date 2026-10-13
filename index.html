@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.44</title>
+ <title>Kuljetuskirja V37.45</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -64,7 +64,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.44 | Päivitetty: 12.10.2026</div>
+<div class="v-tag">V37.45 | Päivitetty: 13.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -738,7 +738,7 @@
  const d = parseFinnishDate(r.date);
  if (!d || d.getMonth() + 1 !== selM || d.getFullYear() !== selY) return false;
  const bill = (r.billing || "").toString().trim();
- return bill !== "" && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(bill);
+ return bill !== "" && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(bill) && !/maksaa|autoon|asiakas/i.test(bill);
  });
  if (filtered.length === 0) {
  showError("Ei laskutettavia kyytejä kuukaudelle " + ans.trim());
@@ -747,10 +747,10 @@
  const tmin = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? (+m[1]) * 60 + (+m[2]) : 0; };
  const fmtT = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? m[1].padStart(2, '0') + ':' + m[2] : String(t || ''); };
  filtered.sort((a, b) => (parseFinnishDate(a.date) - parseFinnishDate(b.date)) || (tmin(a.time) - tmin(b.time)));
- const head = ['Päivä', 'Aika', 'Mistä', 'Mihin', 'Kuka kyydissä', 'Ketä laskutetaan', 'Summa €', 'Auto', 'Huomio'];
+ const head = ['Päivä', 'Aika', 'Mistä', 'Mihin', 'Kuka kyydissä', 'Ketä laskutetaan', 'Summa €', 'Tilaaja', 'Auto', 'Huomio'];
  const body = filtered.map(r => [
  String(r.date || ''), fmtT(r.time), String(r.from || ''), String(r.to || ''), String(r.customer || ''),
- String(r.billing || ''), parseFloat(String(r.price || '0').replace(',', '.')) || 0, String(r.car || ''), String(r.notes || '')
+ String(r.billing || ''), parseFloat(String(r.price || '0').replace(',', '.')) || 0, String(r.orderer || ''), String(r.car || ''), String(r.notes || '')
  ]);
  const fname = `laskutettavat_${selY}-${String(selM).padStart(2, "0")}`;
  const saveBlob = (blob, name) => {
@@ -765,21 +765,37 @@
  body.forEach(row => { csv += row.map(sanitize).join(';') + "\n"; });
  saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), fname + '.csv');
  };
- const makeXlsx = () => {
- const ws = XLSX.utils.aoa_to_sheet([head, ...body]);
- const all = [head, ...body];
- ws['!cols'] = head.map((_, c) => ({ wch: Math.min(60, Math.max(8, ...all.map(row => String(row[c] == null ? '' : row[c]).length)) + 2) }));
+ const makeXlsx = async () => {
+ const wb = new ExcelJS.Workbook();
+ const ws = wb.addWorksheet('Laskutettavat', { views: [{ state: 'frozen', ySplit: 1 }] });
+ ws.addRow(head);
+ body.forEach(row => ws.addRow(row));
  const total = body.reduce((a, row) => a + row[6], 0);
- XLSX.utils.sheet_add_aoa(ws, [['', '', '', '', '', 'Yhteensä', total]], { origin: -1 });
- const wb = XLSX.utils.book_new();
- XLSX.utils.book_append_sheet(wb, ws, 'Laskutettavat');
- const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
- saveBlob(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fname + '.xlsx');
+ const tr = ws.addRow(['', '', '', '', '', 'Yhteensä', total, '', '', '']);
+ const all = [head, ...body];
+ ws.columns.forEach((col, c) => { col.width = Math.min(60, Math.max(8, ...all.map(row => String(row[c] == null ? '' : row[c]).length)) + 3); });
+ const hr = ws.getRow(1);
+ hr.height = 22;
+ hr.eachCell(cell => {
+ cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+ cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } };
+ cell.alignment = { vertical: 'middle', horizontal: 'left' };
+ });
+ hr.getCell(7).alignment = { vertical: 'middle', horizontal: 'right' };
+ ws.getColumn(7).numFmt = '#,##0.00 "€"';
+ ws.getColumn(7).alignment = { horizontal: 'right' };
+ hr.getCell(7).alignment = { vertical: 'middle', horizontal: 'right' };
+ tr.font = { bold: true };
+ tr.getCell(6).alignment = { horizontal: 'right' };
+ tr.getCell(7).border = { top: { style: 'thin' } };
+ ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: head.length } };
+ const buf = await wb.xlsx.writeBuffer();
+ saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fname + '.xlsx');
  };
- if (window.XLSX) { makeXlsx(); return; }
+ if (window.ExcelJS) { makeXlsx().catch(e => { console.error(e); csvFallback(); }); return; }
  const sc = document.createElement('script');
- sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
- sc.onload = () => { try { makeXlsx(); } catch (e) { console.error(e); csvFallback(); } };
+ sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+ sc.onload = () => { makeXlsx().catch(e => { console.error(e); csvFallback(); }); };
  sc.onerror = () => csvFallback();
  document.head.appendChild(sc);
  } catch (error) {
