@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.47</title>
+ <title>Kuljetuskirja V37.48</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -64,14 +64,14 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.47 | Päivitetty: 13.10.2026</div>
+<div class="v-tag">V37.48 | Päivitetty: 14.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
 <div class="manual-fields">
  <div><label>Pvm</label><input type="text" id="inPvm" placeholder="pp.kk.yyyy"></div>
  <div><label>Klo</label><input type="text" id="inKlo" placeholder="hh:mm"></div>
- <div><label>Auto</label><input type="text" id="inAuto" placeholder="123 tai SMB"></div>
+ <div><label>Auto *</label><input type="text" id="inAuto" placeholder="123 tai SMB"></div>
  <div><label>Hinta (€)</label><input type="text" id="inHinta" style="background:#ffff00; color:#000; font-weight:bold;" placeholder="0.00"></div>
  <div><label>Tyyppi</label><input type="text" id="inTyyppi"></div>
  <div class="full-width"><label>Lähtö</label><input type="text" id="inFrom"></div>
@@ -318,6 +318,11 @@
  }
  if (!validateFinnishDate(data.date)) {
  showError("Virheellinen päivämäärä. Käytä muotoa pp.kk.yyyy");
+ return;
+ }
+ if (!data.car) {
+ showError("Auto pakollinen (esim. 485 tai SMB)");
+ document.getElementById('inAuto').focus();
  return;
  }
  if (!data.price) {
