@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.51</title>
+ <title>Kuljetuskirja V37.52</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -64,7 +64,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.51 | Päivitetty: 14.10.2026</div>
+<div class="v-tag">V37.52 | Päivitetty: 14.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -750,7 +750,7 @@
  console.error(error);
  }
  }
- window.exportSubscriberCSV = () => {
+ window.exportSubscriberCSV = async () => {
  try {
  const now = new Date();
  const def = String(now.getMonth() + 1).padStart(2, '0') + '.' + now.getFullYear();
@@ -769,13 +769,21 @@
  showError("Ei laskutettavia kyytejä kuukaudelle " + ans.trim());
  return;
  }
+ let sheetPrices = {}, sheetOk = false;
+ try {
+ const idToken = await auth.currentUser.getIdToken();
+ const resp = await fetch(SHEET_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "prices", idToken: idToken, month: selM }) });
+ const jr = await resp.json();
+ if (jr && jr.ok && jr.prices) { sheetPrices = jr.prices; sheetOk = true; }
+ } catch (e) { console.error(e); }
+ if (!sheetOk) showError("Sheets-hintoja ei saatu – käytetään appin hintoja");
  const tmin = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? (+m[1]) * 60 + (+m[2]) : 0; };
  const fmtT = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? m[1].padStart(2, '0') + ':' + m[2] : String(t || ''); };
  filtered.sort((a, b) => (parseFinnishDate(a.date) - parseFinnishDate(b.date)) || (tmin(a.time) - tmin(b.time)));
  const head = ['Päivä', 'Aika', 'Mistä', 'Mihin', 'Kuka kyydissä', 'Ketä laskutetaan', 'Summa €', 'Tilaaja', 'Auto', 'Huomio'];
  const body = filtered.map(r => [
  String(r.date || ''), fmtT(r.time), String(r.from || ''), String(r.to || ''), String(r.customer || ''),
- String(r.billing || ''), parseFloat(String(r.price || '0').replace(',', '.')) || 0, String(r.orderer || ''), String(r.car || ''), String(r.notes || '')
+ String(r.billing || ''), parseFloat(String(sheetPrices[r.id] != null ? sheetPrices[r.id] : (r.price || '0')).replace(',', '.')) || 0, String(r.orderer || ''), String(r.car || ''), String(r.notes || '')
  ]);
  const fname = `laskutettavat_${selY}-${String(selM).padStart(2, "0")}`;
  const saveBlob = (blob, name) => {
