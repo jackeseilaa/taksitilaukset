@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.53</title>
+ <title>Kuljetuskirja V37.54</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -54,6 +54,8 @@
  .action-btn { background: #222; border: 1px solid #444; font-size: 1.1rem; cursor: pointer; color: var(--accent2); padding: 6px 10px; border-radius: 4px; margin-right: 5px; }
  .del-btn { color: var(--del); border-color: var(--del); }
  .error-msg { color: #ff6666; font-size: 0.9rem; margin-top: 5px; }
+ @keyframes missingFlash { 0%, 100% { background: #000; border-color: #555; box-shadow: none; } 50% { background: #b00020; border-color: #ff4d4d; box-shadow: 0 0 10px 2px #ff1a1a; } }
+ .flash-missing { animation: missingFlash 0.35s ease-in-out 2; }
  </style>
 </head>
 <body>
@@ -64,7 +66,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.53 | Päivitetty: 21.10.2026</div>
+<div class="v-tag">V37.54 | Päivitetty: 21.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -322,7 +324,12 @@
  }
  if (!data.car) {
  showError("Auto pakollinen (esim. 485 tai SMB)");
- document.getElementById('inAuto').focus();
+ const carEl = document.getElementById('inAuto');
+ carEl.focus();
+ carEl.classList.remove('flash-missing');
+ void carEl.offsetWidth;
+ carEl.classList.add('flash-missing');
+ carEl.addEventListener('animationend', () => carEl.classList.remove('flash-missing'), { once: true });
  return;
  }
  if (!data.price) {
