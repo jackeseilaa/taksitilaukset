@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.54</title>
+ <title>Kuljetuskirja V37.55</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -66,7 +66,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.54 | Päivitetty: 21.10.2026</div>
+<div class="v-tag">V37.55 | Päivitetty: 23.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -93,6 +93,7 @@
  <button class="btn-csv export-date" id="btnSetSMB" style="background: #2a4a2a;">ASETA SMB TÄNÄÄN</button>
  <button class="btn-csv export-date" onclick="openExportModal('date')">LATAA PÄIVÄ/AIKAVÄLI</button>
  <button class="btn-csv export-subscriber" onclick="exportSubscriberCSV()">LATAA LASKUTETTAVAT (EXCEL)</button>
+ <button class="btn-csv export-subscriber" onclick="openShiftModal()">LASKULIITE: AJOVUOROT (EXCEL)</button>
  <button class="btn-csv" id="btnClear" onclick="clearForm()" style="background: #3a2a2a;">TYHJENNÄ</button>
  <button class="btn-cancel" id="btnCancel" onclick="cancelEdit()">PERUUTA MUOKKAUS</button>
 </div>
@@ -123,6 +124,21 @@
  <div class="modal-buttons">
  <button class="modal-btn ok" onclick="performExport()">LATAA CSV</button>
  <button class="modal-btn cancel" onclick="closeExportModal()">PERUUTA</button>
+ </div>
+ </div>
+</div>
+<div class="modal-overlay" id="shiftModal">
+ <div class="modal-box" style="max-width:520px;">
+ <div class="modal-title">Laskuliite: ajovuorot (Taksipalvelu Simonen)</div>
+ <div class="modal-field"><label>Alkupäivä (pp.kk.yyyy)</label><input type="text" id="shiftFrom" placeholder="12.10.2026"></div>
+ <div class="modal-field"><label>Loppupäivä (pp.kk.yyyy)</label><input type="text" id="shiftTo" placeholder="23.10.2026"></div>
+ <div class="modal-buttons" style="margin-top:0;"><button class="modal-btn ok" onclick="loadShifts()">HAE VUOROT</button></div>
+ <div class="modal-field" id="shiftList" style="margin-top:12px;"></div>
+ <div class="modal-field" id="shiftSummary" style="display:none; border-top:1px solid #555; padding-top:8px;"></div>
+ <div class="modal-field" id="shiftMsg" style="display:none; color:#ff8080;"></div>
+ <div class="modal-buttons">
+ <button class="modal-btn ok" id="shiftDl" onclick="downloadShiftXlsx()" disabled>LATAA EXCEL</button>
+ <button class="modal-btn cancel" onclick="closeShiftModal()">SULJE</button>
  </div>
  </div>
 </div>
@@ -846,7 +862,145 @@
  console.error(error);
  }
  };
- document.getElementById('btnSetSMB').onclick = () => { 
+ /* ===== Laskuliite: ajovuorot (Taksipalvelu Simonen) ===== */
+ const SHIFT_ALV_KASSA = 13.5, SHIFT_OSUUS = 55, SHIFT_ALV_LASKU = 25.5;
+ const shiftR2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
+ const shiftWd = ['Su', 'Ma', 'Ti', 'Ke', 'To', 'Pe', 'La'];
+ const shiftIsoToDate = (s) => { const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+ const shiftFmt = (d) => String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
+ const shiftIso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+ const shiftEur = (x) => x.toFixed(2).replace('.', ',') + ' €';
+ let shiftRows = [];
+ window.buildShiftSummary = (rows) => {
+ const lines = rows.map(r => {
+ const a0 = shiftR2(r.brutto / (1 + SHIFT_ALV_KASSA / 100));
+ const p = shiftR2(r.brutto / (1 + SHIFT_ALV_KASSA / 100) * (SHIFT_OSUUS / 100));
+ return { date: r.date, car: r.car, brutto: r.brutto, alv0: a0, palkkio: p };
+ });
+ const sum = (k) => shiftR2(lines.reduce((a, l) => a + l[k], 0));
+ const palkkio = sum('palkkio');
+ const alv = shiftR2(palkkio * SHIFT_ALV_LASKU / 100);
+ return { lines, brutto: sum('brutto'), alv0: sum('alv0'), palkkio, alv, total: shiftR2(palkkio + alv) };
+ };
+ window.openShiftModal = () => {
+ const today = new Date();
+ const mon = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7) - 7);
+ document.getElementById('shiftFrom').value = shiftFmt(mon);
+ document.getElementById('shiftTo').value = shiftFmt(today);
+ shiftRows = [];
+ renderShiftList();
+ document.getElementById('shiftModal').classList.add('active');
+ };
+ window.closeShiftModal = () => document.getElementById('shiftModal').classList.remove('active');
+ const shiftMsg = (t) => { const el = document.getElementById('shiftMsg'); el.textContent = t || ''; el.style.display = t ? 'block' : 'none'; };
+ window.loadShifts = async () => {
+ shiftMsg('');
+ const f = parseFinnishDate(document.getElementById('shiftFrom').value.trim());
+ const t = parseFinnishDate(document.getElementById('shiftTo').value.trim());
+ if (!f || !t || f > t) { shiftMsg('Anna alku- ja loppupäivä muodossa pp.kk.vvvv'); return; }
+ try {
+ const idToken = await auth.currentUser.getIdToken();
+ const resp = await fetch(SHEET_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'shifts', idToken: idToken, from: shiftIso(f), to: shiftIso(t) }) });
+ const jr = await resp.json();
+ if (!jr || !jr.ok || !Array.isArray(jr.shifts)) { shiftMsg('Sheets ei palauttanut vuoroja' + (jr && jr.error ? ': ' + jr.error : '') + '.'); return; }
+ shiftRows = jr.shifts.map(s => ({ date: s.date, car: String(s.car || ''), brutto: Number(s.brutto) || 0, start: s.start || '', end: s.end || '', billed: s.billed || '', on: (Number(s.brutto) || 0) > 0 && !s.billed }));
+ if (shiftRows.length === 0) shiftMsg('Ei ajovuoroja valitulla aikavälillä.');
+ renderShiftList();
+ } catch (e) { console.error(e); shiftMsg('Haku epäonnistui: ' + e.message); }
+ };
+ const renderShiftList = () => {
+ const box = document.getElementById('shiftList');
+ box.textContent = '';
+ shiftRows.forEach((r, i) => {
+ const d = shiftIsoToDate(r.date);
+ const lab = document.createElement('label');
+ lab.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px;';
+ const cb = document.createElement('input');
+ cb.type = 'checkbox'; cb.checked = r.on; cb.style.width = 'auto';
+ cb.onchange = () => { r.on = cb.checked; renderShiftSummary(); };
+ const txt = document.createElement('span');
+ let s = shiftWd[d.getDay()] + ' ' + shiftFmt(d).slice(0, 5) + ' · auto ' + r.car + ' · ' + (r.start || '?') + '–' + (r.end || '?') + ' · ' + shiftEur(r.brutto);
+ if (r.brutto <= 0) s += ' ⚠ ei kassaa';
+ if (r.billed) s += ' (laskutettu: ' + r.billed + ')';
+ txt.textContent = s;
+ lab.appendChild(cb); lab.appendChild(txt); box.appendChild(lab);
+ });
+ renderShiftSummary();
+ };
+ const renderShiftSummary = () => {
+ const sel = shiftRows.filter(r => r.on);
+ const box = document.getElementById('shiftSummary');
+ document.getElementById('shiftDl').disabled = sel.length === 0;
+ if (sel.length === 0) { box.style.display = 'none'; return; }
+ const s = buildShiftSummary(sel);
+ box.style.display = 'block';
+ box.textContent = 'Valittu ' + sel.length + ' vuoroa · bruttokassa ' + shiftEur(s.brutto) + ' · palkkio (alv 0 %) ' + shiftEur(s.palkkio) + ' · alv ' + SHIFT_ALV_LASKU.toString().replace('.', ',') + ' % ' + shiftEur(s.alv) + ' · laskun summa ' + shiftEur(s.total);
+ };
+ window.downloadShiftXlsx = async () => {
+ try {
+ const sel = shiftRows.filter(r => r.on);
+ if (sel.length === 0) return;
+ const s = buildShiftSummary(sel);
+ const d0 = shiftIsoToDate(sel[0].date), d1 = shiftIsoToDate(sel[sel.length - 1].date);
+ const fname = 'erittely_ajovuorot_' + sel[0].date + '_' + sel[sel.length - 1].date;
+ const saveBlob = (blob, name) => { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 100); };
+ const csvFallback = () => {
+ let csv = '﻿Pvm;Pv;Auto;Bruttokassa;Kassa alv 0 %;Palkkio 55 %\n';
+ s.lines.forEach(l => { const dd = shiftIsoToDate(l.date); csv += [shiftFmt(dd), shiftWd[dd.getDay()], l.car, l.brutto.toFixed(2).replace('.', ','), l.alv0.toFixed(2).replace('.', ','), l.palkkio.toFixed(2).replace('.', ',')].join(';') + '\n'; });
+ csv += ';;Yhteensä;' + s.brutto.toFixed(2).replace('.', ',') + ';' + s.alv0.toFixed(2).replace('.', ',') + ';' + s.palkkio.toFixed(2).replace('.', ',') + '\n';
+ csv += ';;Alv ' + SHIFT_ALV_LASKU + ' %;;;' + s.alv.toFixed(2).replace('.', ',') + '\n;;Laskun summa;;;' + s.total.toFixed(2).replace('.', ',') + '\n';
+ saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), fname + '.csv');
+ };
+ const makeXlsx = async () => {
+ const wb = new ExcelJS.Workbook();
+ const ws = wb.addWorksheet('Ajovuorot');
+ const eur = '#,##0.00 "€"';
+ ws.getCell('A1').value = 'Ajovuorojen erittely – ' + shiftFmt(d0) + '–' + shiftFmt(d1);
+ ws.getCell('A1').font = { bold: true, size: 14 };
+ ws.getCell('A2').value = 'Laskuttaja: AJarmo Oy  ·  Laskutettava: Taksipalvelu Simonen';
+ ws.getCell('A2').font = { color: { argb: 'FF555555' } };
+ const hdr = ['Pvm', 'Pv', 'Auto', 'Bruttokassa (sis. alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %)', 'Kassa alv 0 %', 'Palkkio ' + SHIFT_OSUUS + ' %'];
+ const hr = ws.getRow(4); hr.height = 32;
+ hdr.forEach((h, i) => { const c = hr.getCell(i + 1); c.value = h; c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3A5F' } }; c.alignment = { wrapText: true, horizontal: 'center', vertical: 'middle' }; });
+ let r = 5;
+ s.lines.forEach(l => {
+ const dd = shiftIsoToDate(l.date);
+ const row = ws.getRow(r++);
+ [new Date(Date.UTC(dd.getFullYear(), dd.getMonth(), dd.getDate())), shiftWd[dd.getDay()], /^\d+$/.test(l.car) ? Number(l.car) : l.car, l.brutto, l.alv0, l.palkkio].forEach((v, i) => {
+ const c = row.getCell(i + 1); c.value = v;
+ c.border = { bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } } };
+ if (i === 0) c.numFmt = 'd.m.yyyy';
+ if (i >= 3) c.numFmt = eur;
+ if (i === 1 || i === 2) c.alignment = { horizontal: 'center' };
+ });
+ });
+ const tr = ws.getRow(r++);
+ tr.getCell(4).value = s.brutto; tr.getCell(5).value = s.alv0;
+ [4, 5].forEach(i => { tr.getCell(i).numFmt = eur; });
+ for (let i = 1; i <= 6; i++) { tr.getCell(i).font = { bold: true }; tr.getCell(i).border = { top: { style: 'medium' } }; }
+ [['Yhteensä (alv 0 %)', s.palkkio], ['Alv ' + String(SHIFT_ALV_LASKU).replace('.', ',') + ' %', s.alv], ['Laskun summa (sis. alv)', s.total]].forEach(([lab, v]) => {
+ const row = ws.getRow(r++);
+ row.getCell(1).value = lab; row.getCell(1).font = { bold: true };
+ const c = row.getCell(6); c.value = v; c.numFmt = eur; c.font = { bold: true };
+ });
+ r++;
+ ws.getCell('A' + r).value = 'Palkkio = päivän bruttokassa ÷ ' + (1 + SHIFT_ALV_KASSA / 100).toFixed(3).replace('.', ',') + ' × ' + SHIFT_OSUUS + ' %. Kassa on päivän kassasumma, johon sisältyy alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %.';
+ ws.getCell('A' + r).font = { italic: true, color: { argb: 'FF555555' } };
+ [11, 5, 7, 22, 14, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+ ws.pageSetup = { orientation: 'landscape', fitToPage: true };
+ const buf = await wb.xlsx.writeBuffer();
+ saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fname + '.xlsx');
+ };
+ if (window.ExcelJS) { makeXlsx().catch(e => { console.error(e); csvFallback(); }); return; }
+ const sc = document.createElement('script');
+ sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+ sc.onload = () => { makeXlsx().catch(e => { console.error(e); csvFallback(); }); };
+ sc.onerror = () => csvFallback();
+ document.head.appendChild(sc);
+ } catch (e) { console.error(e); shiftMsg('Excelin teko epäonnistui: ' + e.message); }
+ };
+ /* ===== /Laskuliite ===== */
+ document.getElementById('btnSetSMB').onclick = () => {
  document.getElementById('inAuto').value = "SMB"; 
  document.getElementById('inPvm').value = new Date().toLocaleDateString('fi-FI'); 
  };
