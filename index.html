@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.55</title>
+ <title>Kuljetuskirja V37.56</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -66,7 +66,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.55 | Päivitetty: 23.10.2026</div>
+<div class="v-tag">V37.56 | Päivitetty: 23.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -92,7 +92,7 @@
  <button class="btn-csv export-all" onclick="window.downloadAllCSV()">LATAA KOKO CSV</button>
  <button class="btn-csv export-date" id="btnSetSMB" style="background: #2a4a2a;">ASETA SMB TÄNÄÄN</button>
  <button class="btn-csv export-date" onclick="openExportModal('date')">LATAA PÄIVÄ/AIKAVÄLI</button>
- <button class="btn-csv export-subscriber" onclick="exportSubscriberCSV()">LATAA LASKUTETTAVAT (EXCEL)</button>
+ <button class="btn-csv export-subscriber" onclick="openBillModal()">LATAA LASKUTETTAVAT (EXCEL)</button>
  <button class="btn-csv export-subscriber" onclick="openShiftModal()">LASKULIITE: AJOVUOROT (EXCEL)</button>
  <button class="btn-csv" id="btnClear" onclick="clearForm()" style="background: #3a2a2a;">TYHJENNÄ</button>
  <button class="btn-cancel" id="btnCancel" onclick="cancelEdit()">PERUUTA MUOKKAUS</button>
@@ -124,6 +124,21 @@
  <div class="modal-buttons">
  <button class="modal-btn ok" onclick="performExport()">LATAA CSV</button>
  <button class="modal-btn cancel" onclick="closeExportModal()">PERUUTA</button>
+ </div>
+ </div>
+</div>
+<div class="modal-overlay" id="billModal">
+ <div class="modal-box" style="max-width:520px;">
+ <div class="modal-title">Laskutettavat kyydit (Excel)</div>
+ <div class="modal-field"><label>Alkupäivä (pp.kk.yyyy)</label><input type="text" id="billFrom" placeholder="12.10.2026"></div>
+ <div class="modal-field"><label>Loppupäivä (pp.kk.yyyy)</label><input type="text" id="billTo" placeholder="18.10.2026"></div>
+ <div class="modal-buttons" style="margin-top:0;"><button class="modal-btn ok" onclick="loadBillRides()">HAE KYYDIT</button></div>
+ <div class="modal-field" id="billList" style="margin-top:12px;"></div>
+ <div class="modal-field" id="billSummary" style="display:none; border-top:1px solid #555; padding-top:8px;"></div>
+ <div class="modal-field" id="billMsg" style="display:none; color:#ff8080;"></div>
+ <div class="modal-buttons">
+ <button class="modal-btn ok" id="billDl" onclick="downloadBillXlsx()" disabled>LATAA EXCEL</button>
+ <button class="modal-btn cancel" onclick="closeBillModal()">SULJE</button>
  </div>
  </div>
 </div>
@@ -862,6 +877,128 @@
  console.error(error);
  }
  };
+ /* ===== Laskutettavat kyydit: esikatselu ja valinta ===== */
+ const billIsBillable = (r) => { const bill = (r.billing || "").toString().trim(); return bill !== "" && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(bill) && !/maksaa|autoon|asiakas/i.test(bill); };
+ const billTmin = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? (+m[1]) * 60 + (+m[2]) : 0; };
+ const billFmtT = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? m[1].padStart(2, '0') + ':' + m[2] : String(t || ''); };
+ const billFmtD = (d) => String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
+ const billEur = (x) => x.toFixed(2).replace('.', ',') + ' €';
+ let billRows = [];
+ window.openBillModal = () => {
+ const today = new Date();
+ const mon = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7) - 7);
+ const sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
+ document.getElementById('billFrom').value = billFmtD(mon);
+ document.getElementById('billTo').value = billFmtD(sun);
+ billRows = [];
+ renderBillList();
+ document.getElementById('billModal').classList.add('active');
+ };
+ window.closeBillModal = () => document.getElementById('billModal').classList.remove('active');
+ const billMsg = (t) => { const el = document.getElementById('billMsg'); el.textContent = t || ''; el.style.display = t ? 'block' : 'none'; };
+ window.loadBillRides = async () => {
+ billMsg('');
+ const f = parseFinnishDate(document.getElementById('billFrom').value.trim());
+ const t = parseFinnishDate(document.getElementById('billTo').value.trim());
+ if (!f || !t || f > t) { billMsg('Anna alku- ja loppupäivä muodossa pp.kk.vvvv'); return; }
+ const rides = currentLogs.filter(r => { const d = parseFinnishDate(r.date); return d && d >= f && d <= t && billIsBillable(r); });
+ let sheetPrices = {}, sheetOk = true;
+ try {
+ const idToken = await auth.currentUser.getIdToken();
+ const months = new Set();
+ for (let d = new Date(f.getFullYear(), f.getMonth(), 1); d <= t; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) months.add(d.getMonth() + 1);
+ for (const mo of months) {
+ const resp = await fetch(SHEET_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'prices', idToken: idToken, month: mo }) });
+ const jr = await resp.json();
+ if (jr && jr.ok && jr.prices) Object.assign(sheetPrices, jr.prices); else sheetOk = false;
+ }
+ } catch (e) { console.error(e); sheetOk = false; }
+ if (!sheetOk) billMsg('Sheets-hintoja ei saatu – käytetään appin hintoja');
+ rides.sort((a, b) => (parseFinnishDate(a.date) - parseFinnishDate(b.date)) || (billTmin(a.time) - billTmin(b.time)));
+ billRows = rides.map(r => ({
+ date: String(r.date || ''), time: billFmtT(r.time), from: String(r.from || ''), to: String(r.to || ''), customer: String(r.customer || ''),
+ billing: String(r.billing || ''), price: parseFloat(String(sheetPrices[r.id] != null ? sheetPrices[r.id] : (r.price || '0')).replace(',', '.')) || 0,
+ orderer: String(r.orderer || ''), car: String(r.car || ''), notes: String(r.notes || ''), on: true
+ }));
+ if (billRows.length === 0) billMsg('Ei laskutettavia kyytejä valitulla aikavälillä.');
+ renderBillList();
+ };
+ const renderBillList = () => {
+ const box = document.getElementById('billList');
+ box.textContent = '';
+ billRows.forEach(r => {
+ const lab = document.createElement('label');
+ lab.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;';
+ const cb = document.createElement('input');
+ cb.type = 'checkbox'; cb.checked = r.on; cb.style.width = 'auto'; cb.style.marginTop = '4px';
+ cb.onchange = () => { r.on = cb.checked; renderBillSummary(); };
+ const txt = document.createElement('span');
+ let s = r.date.slice(0, 5) + ' ' + r.time + ' · ' + (r.from || '?') + ' → ' + (r.to || '?') + (r.customer ? ' · ' + r.customer : '') + ' · ' + r.billing + ' · ' + billEur(r.price);
+ if (r.price <= 0) s += ' ⚠ ei hintaa';
+ txt.textContent = s;
+ lab.appendChild(cb); lab.appendChild(txt); box.appendChild(lab);
+ });
+ renderBillSummary();
+ };
+ const renderBillSummary = () => {
+ const sel = billRows.filter(r => r.on);
+ const box = document.getElementById('billSummary');
+ document.getElementById('billDl').disabled = sel.length === 0;
+ if (sel.length === 0) { box.style.display = 'none'; return; }
+ const total = Math.round(sel.reduce((a, r) => a + r.price, 0) * 100) / 100;
+ box.style.display = 'block';
+ box.textContent = 'Valittu ' + sel.length + '/' + billRows.length + ' kyytiä · yhteensä ' + billEur(total);
+ };
+ window.downloadBillXlsx = async () => {
+ try {
+ const sel = billRows.filter(r => r.on);
+ if (sel.length === 0) return;
+ const head = ['Päivä', 'Aika', 'Mistä', 'Mihin', 'Kuka kyydissä', 'Ketä laskutetaan', 'Summa €', 'Tilaaja', 'Auto', 'Huomio'];
+ const body = sel.map(r => [r.date, r.time, r.from, r.to, r.customer, r.billing, r.price, r.orderer, r.car, r.notes]);
+ const di = (s) => { const d = parseFinnishDate(s); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+ const fname = 'laskutettavat_' + di(sel[0].date) + '_' + di(sel[sel.length - 1].date);
+ const saveBlob = (blob, name) => { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 100); };
+ const csvFallback = () => {
+ const sanitize = (val) => String(val == null ? '' : val).replace(/;/g, ',').replace(/"/g, '').trim();
+ let csv = "﻿" + head.join(';') + "\n";
+ body.forEach(row => { csv += row.map(sanitize).join(';') + "\n"; });
+ saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), fname + '.csv');
+ };
+ const makeXlsx = async () => {
+ const wb = new ExcelJS.Workbook();
+ const ws = wb.addWorksheet('Laskutettavat', { views: [{ state: 'frozen', ySplit: 1 }] });
+ ws.addRow(head);
+ body.forEach(row => ws.addRow(row));
+ const total = body.reduce((a, row) => a + row[6], 0);
+ const tr = ws.addRow(['', '', '', '', '', 'Yhteensä', Math.round(total * 100) / 100, '', '', '']);
+ const all = [head, ...body];
+ ws.columns.forEach((col, c) => { col.width = Math.min(60, Math.max(8, ...all.map(row => String(row[c] == null ? '' : row[c]).length)) + 3); });
+ const hr = ws.getRow(1);
+ hr.height = 22;
+ hr.eachCell(cell => {
+ cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+ cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } };
+ cell.alignment = { vertical: 'middle', horizontal: 'left' };
+ });
+ ws.getColumn(7).numFmt = '#,##0.00 "€"';
+ ws.getColumn(7).alignment = { horizontal: 'right' };
+ hr.getCell(7).alignment = { vertical: 'middle', horizontal: 'right' };
+ tr.font = { bold: true };
+ tr.getCell(6).alignment = { horizontal: 'right' };
+ tr.getCell(7).border = { top: { style: 'thin' } };
+ ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: head.length } };
+ const buf = await wb.xlsx.writeBuffer();
+ saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fname + '.xlsx');
+ };
+ if (window.ExcelJS) { makeXlsx().catch(e => { console.error(e); csvFallback(); }); return; }
+ const sc = document.createElement('script');
+ sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+ sc.onload = () => { makeXlsx().catch(e => { console.error(e); csvFallback(); }); };
+ sc.onerror = () => csvFallback();
+ document.head.appendChild(sc);
+ } catch (e) { console.error(e); billMsg('Excelin teko epäonnistui: ' + e.message); }
+ };
+ /* ===== /Laskutettavat kyydit ===== */
  /* ===== Laskuliite: ajovuorot (Taksipalvelu Simonen) ===== */
  const SHIFT_ALV_KASSA = 13.5, SHIFT_OSUUS = 55, SHIFT_ALV_LASKU = 25.5;
  const shiftR2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
