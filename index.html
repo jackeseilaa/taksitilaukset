@@ -66,7 +66,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.56 | Päivitetty: 23.10.2026</div>
+<div class="v-tag">V37.57 | Päivitetty: 25.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -84,6 +84,17 @@
  <div class="full-width"><label>Lasku / Maksaja</label><input type="text" id="inLasku"></div>
  <div class="full-width"><label>Huomio</label><input type="text" id="inHuomio"></div>
  <div class="full-width"><label>Poikkeamat</label><input type="text" id="inPoikkeama"></div>
+ <div class="full-width" id="receiptBox">
+  <label>Kuitti / kuva</label>
+  <input type="file" id="inKuitti" accept="image/*" style="display:none">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+   <button type="button" class="btn-csv" id="btnReceipt" style="background:#2a3a4a;">📷 LISÄÄ KUITTI</button>
+   <button type="button" class="btn-csv" id="btnReceiptShare" style="background:#25d366;color:#000;display:none;">↗ JAA</button>
+   <button type="button" class="btn-csv" id="btnReceiptRemove" style="background:#3a2a2a;display:none;">POISTA KUVA</button>
+  </div>
+  <img id="receiptPreview" alt="" style="display:none;max-width:100%;max-height:220px;margin-top:8px;border:1px solid #555;border-radius:4px;">
+  <div id="receiptInfo" style="margin-top:6px;font-size:0.85rem;color:#aaa;"></div>
+ </div>
  <div class="full-width" id="errorMsg" style="display:none;"></div>
 </div>
 <div class="btn-row">
@@ -212,6 +223,150 @@
  saveQueue(q);
  flushSheetQueue();
  }
+
+ // ===== KUITTI / KUVALIITE =====
+ let pendingReceipt = null; // { blob, b64, dataUrl }
+ let existingReceipt = null; // { id, url, name } (muokattavan kyydin kuitti)
+ const receiptBlobCache = {}; // receiptId -> Blob (jakoa varten)
+ async function scriptCall(payload) {
+ const idToken = await auth.currentUser.getIdToken();
+ const r = await fetch(SHEET_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(Object.assign({ idToken: idToken }, payload)) });
+ return await r.json();
+ }
+ function setReceiptInfo(t) { const el = document.getElementById('receiptInfo'); if (el) el.textContent = t || ""; }
+ function receiptFileName(d) {
+ const m = String(d.date || "").match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+ const ds = m ? m[3] + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0") : "paivamaara";
+ const tm = String(d.time || "").match(/(\d{1,2})[.:](\d{2})/);
+ const ts = tm ? tm[1].padStart(2, "0") + tm[2] : "0000";
+ return "kuitti_" + ds + "_" + ts + "_" + String(d.car || "auto") + ".jpg";
+ }
+ function withReceiptNote(data, url) {
+ if (!url) return data;
+ const base = String(data.notes || "");
+ if (base.indexOf(url) >= 0) return data;
+ return Object.assign({}, data, { notes: (base ? base + " | " : "") + "Kuitti: " + url });
+ }
+ function compressImage(file) {
+ return new Promise((resolve, reject) => {
+ const url = URL.createObjectURL(file);
+ const img = new Image();
+ img.onload = () => {
+ const MAX = 1600;
+ let w = img.naturalWidth, h = img.naturalHeight;
+ const k = Math.min(1, MAX / Math.max(w, h));
+ w = Math.round(w * k); h = Math.round(h * k);
+ const c = document.createElement("canvas"); c.width = w; c.height = h;
+ const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+ URL.revokeObjectURL(url);
+ c.toBlob((blob) => {
+ if (!blob) { reject(new Error("Kuvan pakkaus epäonnistui")); return; }
+ const fr = new FileReader();
+ fr.onload = () => { const du = String(fr.result); resolve({ blob: blob, b64: du.split(",")[1], dataUrl: du }); };
+ fr.onerror = () => reject(new Error("Kuvan luku epäonnistui"));
+ fr.readAsDataURL(blob);
+ }, "image/jpeg", 0.8);
+ };
+ img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Kuvaa ei voitu avata")); };
+ img.src = url;
+ });
+ }
+ function updateReceiptButtons() {
+ const has = !!pendingReceipt || !!existingReceipt;
+ document.getElementById('btnReceiptShare').style.display = has ? '' : 'none';
+ document.getElementById('btnReceiptRemove').style.display = pendingReceipt ? '' : 'none';
+ document.getElementById('btnReceipt').textContent = has ? "📷 VAIHDA KUVA" : "📷 LISÄÄ KUITTI";
+ }
+ function resetReceiptUI() {
+ pendingReceipt = null; existingReceipt = null;
+ const pv = document.getElementById('receiptPreview'); if (pv) { pv.style.display = 'none'; pv.removeAttribute('src'); }
+ const fi = document.getElementById('inKuitti'); if (fi) fi.value = '';
+ setReceiptInfo("");
+ if (document.getElementById('btnReceipt')) updateReceiptButtons();
+ }
+ function showExistingReceipt(r) {
+ resetReceiptUI();
+ if (r && r.receiptId && r.receiptUrl) {
+ existingReceipt = { id: r.receiptId, url: r.receiptUrl, name: r.receiptName || "kuitti.jpg" };
+ const info = document.getElementById('receiptInfo');
+ info.textContent = "";
+ const a = document.createElement('a'); a.href = existingReceipt.url; a.target = "_blank"; a.rel = "noopener"; a.textContent = "📎 Kuitti tallennettu: " + existingReceipt.name;
+ info.appendChild(a);
+ }
+ updateReceiptButtons();
+ }
+ async function shareBlob(blob, name) {
+ const file = new File([blob], name, { type: "image/jpeg" });
+ if (navigator.canShare && navigator.canShare({ files: [file] })) {
+ await navigator.share({ files: [file], title: "Kuitti" });
+ return true;
+ }
+ // Varakeino: lataa kuva laitteelle
+ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+ return false;
+ }
+ async function getReceiptBlob(id) {
+ if (receiptBlobCache[id]) return receiptBlobCache[id];
+ const res = await scriptCall({ action: "receiptGet", id: id });
+ if (!res || !res.ok) throw new Error((res && res.error) || "ei yhteyttä");
+ const bin = atob(res.b64); const arr = new Uint8Array(bin.length);
+ for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+ receiptBlobCache[id] = new Blob([arr], { type: "image/jpeg" });
+ return receiptBlobCache[id];
+ }
+ window.shareReceipt = async (logId) => {
+ const r = currentLogs.find(l => l.id === logId);
+ if (!r || !r.receiptId) return;
+ try {
+ const hadCache = !!receiptBlobCache[r.receiptId];
+ const blob = await getReceiptBlob(r.receiptId);
+ try { await shareBlob(blob, r.receiptName || "kuitti.jpg"); }
+ catch (e) {
+ if (e && e.name === "AbortError") return;
+ if (!hadCache) showError("Kuva ladattu. Paina ↗ uudelleen niin jakovalikko aukeaa.");
+ else showError("Jako epäonnistui: " + e.message);
+ }
+ } catch (e) { showError("Kuvan haku epäonnistui: " + e.message); }
+ };
+ function receiptCell(r) {
+ if (!r.receiptId || !/^https:\/\//.test(String(r.receiptUrl || ""))) return "";
+ return `<a class="action-btn" href="${escapeHtml(r.receiptUrl)}" target="_blank" rel="noopener" style="text-decoration:none;" title="Avaa kuitti">📎</a>` +
+ `<button class="action-btn" onclick="window.shareReceipt('${r.id}')" title="Jaa kuitti">↗</button>`;
+ }
+ document.addEventListener('DOMContentLoaded', () => {
+ const fi = document.getElementById('inKuitti');
+ document.getElementById('btnReceipt').onclick = () => fi.click();
+ fi.onchange = async () => {
+ const f = fi.files && fi.files[0];
+ if (!f) return;
+ try {
+ setReceiptInfo("Pakataan kuvaa…");
+ pendingReceipt = await compressImage(f);
+ const pv = document.getElementById('receiptPreview'); pv.src = pendingReceipt.dataUrl; pv.style.display = '';
+ setReceiptInfo("Kuva valmis (" + Math.round(pendingReceipt.blob.size / 1024) + " kt). Se tallentuu Driveen kun painat TALLENNA.");
+ } catch (e) { pendingReceipt = null; setReceiptInfo(""); showError(e.message); }
+ updateReceiptButtons();
+ };
+ document.getElementById('btnReceiptRemove').onclick = () => {
+ pendingReceipt = null; fi.value = '';
+ const pv = document.getElementById('receiptPreview'); pv.style.display = 'none'; pv.removeAttribute('src');
+ setReceiptInfo(""); 
+ if (existingReceipt) showExistingReceipt({ receiptId: existingReceipt.id, receiptUrl: existingReceipt.url, receiptName: existingReceipt.name });
+ updateReceiptButtons();
+ };
+ document.getElementById('btnReceiptShare').onclick = async () => {
+ try {
+ if (pendingReceipt) {
+ await shareBlob(pendingReceipt.blob, receiptFileName({ date: document.getElementById('inPvm').value.trim(), time: document.getElementById('inKlo').value.trim(), car: document.getElementById('inAuto').value.trim() }));
+ } else if (existingReceipt) {
+ const hadCache = !!receiptBlobCache[existingReceipt.id];
+ const blob = await getReceiptBlob(existingReceipt.id);
+ try { await shareBlob(blob, existingReceipt.name); }
+ catch (e) { if (e && e.name === "AbortError") return; if (!hadCache) showError("Kuva ladattu. Paina JAA uudelleen."); else showError("Jako epäonnistui: " + e.message); }
+ }
+ } catch (e) { if (!(e && e.name === "AbortError")) showError("Jako epäonnistui: " + e.message); }
+ };
+ });
  let currentLogs = [];
  let editId = null;
  let exportMode = 'today';
@@ -296,6 +451,7 @@
  <td>${escapeHtml(r.notes || '-')}</td>
  <td>${escapeHtml(r.deviation || '-')}</td>
  <td>
+ ${receiptCell(r)}
  <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
  <button class="action-btn del-btn" onclick="window.deleteEntry('${r.id}')">X</button>
  </td>`;
@@ -371,14 +527,27 @@
  showError("Hinta pitää olla numero");
  return;
  }
+ if (pendingReceipt) {
+ setReceiptInfo("Tallennetaan kuvaa Driveen…");
+ let up;
+ try { up = await scriptCall({ action: "receipt", name: receiptFileName(data), b64: pendingReceipt.b64 }); }
+ catch (e) { up = { ok: false, error: e.message }; }
+ if (!up || !up.ok) {
+ setReceiptInfo("");
+ showError("Kuvan tallennus epäonnistui, kyytiä ei tallennettu: " + ((up && up.error) || "ei yhteyttä") + ". Yritä uudelleen.");
+ return;
+ }
+ data.receiptUrl = up.url; data.receiptId = up.id; data.receiptName = up.name;
+ }
  if (editId) { 
  const savedId = editId;
+ const prevUrl = (currentLogs.find(l => l.id === savedId) || {}).receiptUrl || "";
  await updateDoc(doc(db, "taksitulot", savedId), data); 
  cancelEdit(); 
- queueSheet("upsert", Object.assign({ id: savedId }, data));
+ queueSheet("upsert", Object.assign({ id: savedId }, withReceiptNote(data, data.receiptUrl || prevUrl)));
  } else { 
  const ref = await addDoc(collection(db, "taksitulot"), data); 
- queueSheet("upsert", Object.assign({ id: ref.id }, data));
+ queueSheet("upsert", Object.assign({ id: ref.id }, withReceiptNote(data, data.receiptUrl || "")));
  }
  clearForm();
  } catch (error) {
@@ -422,6 +591,7 @@
  document.getElementById('editModeIndicator').classList.add('active');
  document.getElementById('btnCancel').classList.add('show');
  document.getElementById('btnSave').innerText = "PÄIVITÄ TILAUS";
+ showExistingReceipt(r);
  window.scrollTo(0,0);
  };
  window.deleteEntry = async (id) => { 
@@ -452,6 +622,7 @@
  i.value = '';
  }
  });
+ resetReceiptUI();
  };
  window.parseMessage = () => {
  const msg = document.getElementById('msgInput').value.trim();
