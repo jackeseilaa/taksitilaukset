@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.56</title>
+ <title>Kuljetuskirja V37.58</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -66,7 +66,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.57 | Päivitetty: 25.10.2026</div>
+<div class="v-tag">V37.58 | Päivitetty: 26.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -224,6 +224,24 @@
  flushSheetQueue();
  }
 
+
+ // Poimii kentän tekstistä katuosoitteen karttahakua varten (jättää pois puhelinnumerot, nimet ja paikan nimen)
+ function mapQuery(text) {
+ const raw = String(text || "");
+ const cleaned = raw.replace(/(?:p\.?|puh\.?|tel\.?|gsm)?\s*\+?\d[\d\s-]{6,}\d/gi, " ");
+ const parts = cleaned.split(/[\/,;|\n]+/).map(x => x.trim()).filter(Boolean);
+ const street = /[A-Za-zÅÄÖåäö][A-Za-zÅÄÖåäö\-]*(?:\s[A-Za-zÅÄÖåäö\-]+)*\s\d+(?:\s?[A-Za-z](?![A-Za-zÅÄÖåäö]))?(?:\s?-\s?\d+)?/;
+ for (let i = 0; i < parts.length; i++) {
+ const m = parts[i].match(street);
+ if (m) {
+ let q = m[0].trim();
+ const next = parts[i + 1];
+ if (next && /^(?:\d{5}\s+)?[A-Za-zÅÄÖåäö\- ]{3,}$/.test(next) && !/talo|keskus|koti|toimisto/i.test(next) && next.split(" ").length <= 2) q += ", " + next;
+ return q;
+ }
+ }
+ return cleaned.replace(/\s+/g, " ").trim() || raw;
+ }
  // ===== KUITTI / KUVALIITE =====
  let pendingReceipt = null; // { blob, b64, dataUrl }
  let existingReceipt = null; // { id, url, name } (muokattavan kyydin kuitti)
@@ -437,8 +455,8 @@
  sorted.forEach(r => {
  const tr = document.createElement('tr');
  const phoneLink = r.phone ? `<a href="tel:${escapeHtml(r.phone)}">${escapeHtml(r.phone)}</a>` : '-';
- const fromLink = r.from ? `<a href="https://maps.google.com/?q=${encodeURIComponent(r.from)}" target="_blank">${escapeHtml(r.from)}</a>` : '-';
- const toLink = r.to ? `<a href="https://maps.google.com/?q=${encodeURIComponent(r.to)}" target="_blank">${escapeHtml(r.to)}</a>` : '-';
+ const fromLink = r.from ? `<a href="https://maps.google.com/?q=${encodeURIComponent(mapQuery(r.from))}" target="_blank">${escapeHtml(r.from)}</a>` : '-';
+ const toLink = r.to ? `<a href="https://maps.google.com/?q=${encodeURIComponent(mapQuery(r.to))}" target="_blank">${escapeHtml(r.to)}</a>` : '-';
  tr.innerHTML = `
  <td><b>${escapeHtml(r.date || '-')}</b><br>${escapeHtml(r.time || '-')}</td>
  <td>${escapeHtml(r.car || '-')}</td>
