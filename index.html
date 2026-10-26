@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.58</title>
+ <title>Kuljetuskirja V37.59</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -66,7 +66,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.58 | Päivitetty: 26.10.2026</div>
+<div class="v-tag">V37.59 | Päivitetty: 26.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -259,11 +259,11 @@
  const ts = tm ? tm[1].padStart(2, "0") + tm[2] : "0000";
  return "kuitti_" + ds + "_" + ts + "_" + String(d.car || "auto") + ".jpg";
  }
- function withReceiptNote(data, url) {
- if (!url) return data;
- const base = String(data.notes || "");
- if (base.indexOf(url) >= 0) return data;
- return Object.assign({}, data, { notes: (base ? base + " | " : "") + "Kuitti: " + url });
+ // Kuvan tiedot (linkki, id, nimi) pysyvät vain sovelluksessa ja Drivessä, ei taulukkoon
+ function sheetData(d) {
+ const o = Object.assign({}, d);
+ delete o.receiptUrl; delete o.receiptId; delete o.receiptName;
+ return o;
  }
  function compressImage(file) {
  return new Promise((resolve, reject) => {
@@ -559,13 +559,12 @@
  }
  if (editId) { 
  const savedId = editId;
- const prevUrl = (currentLogs.find(l => l.id === savedId) || {}).receiptUrl || "";
  await updateDoc(doc(db, "taksitulot", savedId), data); 
  cancelEdit(); 
- queueSheet("upsert", Object.assign({ id: savedId }, withReceiptNote(data, data.receiptUrl || prevUrl)));
+ queueSheet("upsert", Object.assign({ id: savedId }, sheetData(data)));
  } else { 
  const ref = await addDoc(collection(db, "taksitulot"), data); 
- queueSheet("upsert", Object.assign({ id: ref.id }, withReceiptNote(data, data.receiptUrl || "")));
+ queueSheet("upsert", Object.assign({ id: ref.id }, sheetData(data)));
  }
  clearForm();
  } catch (error) {
