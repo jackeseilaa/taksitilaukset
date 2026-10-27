@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.59</title>
+ <title>Kuljetuskirja V37.60</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -66,7 +66,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.59 | Päivitetty: 26.10.2026</div>
+<div class="v-tag">V37.60 | Päivitetty: 27.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -107,6 +107,17 @@
  <button class="btn-csv export-subscriber" onclick="openShiftModal()">LASKULIITE: AJOVUOROT (EXCEL)</button>
  <button class="btn-csv" id="btnClear" onclick="clearForm()" style="background: #3a2a2a;">TYHJENNÄ</button>
  <button class="btn-cancel" id="btnCancel" onclick="cancelEdit()">PERUUTA MUOKKAUS</button>
+</div>
+ <div class="full-width" id="vrBox" style="border:1px solid #444;border-radius:8px;padding:10px;margin:12px 0;">
+ <label>Vuororaportti (kuva tallentuu Driveen ja luvut taulukon Vuororaportit-välilehdelle)</label>
+ <input type="file" id="inVR" accept="image/*" style="display:none">
+ <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+  <button type="button" class="btn-csv" id="btnVR" style="background:#2a3a4a;">📷 VUORORAPORTTI</button>
+  <button type="button" class="btn-csv" id="btnVRRot" style="display:none;">↻ KÄÄNNÄ</button>
+  <button type="button" class="btn-csv" id="btnVRSend" style="background:#2a4a2a;display:none;">TALLENNA RAPORTTI</button>
+ </div>
+ <img id="vrPreview" alt="" style="display:none;max-width:100%;max-height:300px;margin-top:8px;border:1px solid #555;border-radius:4px;">
+ <div id="vrInfo" style="margin-top:6px;font-size:0.85rem;color:#aaa;"></div>
 </div>
 <div class="modal-overlay" id="exportModal">
  <div class="modal-box">
@@ -242,6 +253,63 @@
  }
  return cleaned.replace(/\s+/g, " ").trim() || raw;
  }
+
+ // ===== VUORORAPORTTI =====
+ let vrState = null; // { bmp, rot }
+ function vrSetInfo(t, color) { const el = document.getElementById('vrInfo'); el.style.color = color || '#aaa'; el.textContent = t || ""; }
+ function vrRender() {
+ const MAX = 2000;
+ const rot = vrState.rot % 360;
+ const bw = vrState.bmp.width, bh = vrState.bmp.height;
+ const sw = (rot === 90 || rot === 270) ? bh : bw, sh = (rot === 90 || rot === 270) ? bw : bh;
+ const k = Math.min(1, MAX / Math.max(sw, sh));
+ const c = document.createElement("canvas"); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+ const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+ g.translate(c.width / 2, c.height / 2); g.rotate(rot * Math.PI / 180);
+ g.drawImage(vrState.bmp, -bw * k / 2, -bh * k / 2, bw * k, bh * k);
+ return c;
+ }
+ function vrShow() {
+ const c = vrRender();
+ const pv = document.getElementById('vrPreview'); pv.src = c.toDataURL("image/jpeg", 0.5); pv.style.display = '';
+ }
+ document.addEventListener('DOMContentLoaded', () => {
+ const fi = document.getElementById('inVR');
+ document.getElementById('btnVR').onclick = () => fi.click();
+ fi.onchange = async () => {
+ const f = fi.files && fi.files[0]; if (!f) return;
+ try {
+ vrSetInfo("Avataan kuvaa…");
+ vrState = { bmp: await createImageBitmap(f, { imageOrientation: "from-image" }), rot: 0 };
+ // jos kuva on leveämpi kuin korkea, raportti on todennäköisesti sivuttain
+ if (vrState.bmp.width > vrState.bmp.height) vrState.rot = 90;
+ vrShow();
+ document.getElementById('btnVRRot').style.display = '';
+ document.getElementById('btnVRSend').style.display = '';
+ vrSetInfo("Tarkista, että teksti on suorassa (käytä ↻ KÄÄNNÄ) ja paina TALLENNA RAPORTTI.");
+ } catch (e) { vrState = null; vrSetInfo("Kuvaa ei voitu avata: " + e.message, '#ff6666'); }
+ };
+ document.getElementById('btnVRRot').onclick = () => { if (vrState) { vrState.rot = (vrState.rot + 90) % 360; vrShow(); } };
+ document.getElementById('btnVRSend').onclick = async () => {
+ if (!vrState) return;
+ const btn = document.getElementById('btnVRSend'); btn.disabled = true;
+ try {
+ vrSetInfo("Lähetetään ja luetaan raporttia… (voi kestää 20 s)");
+ const c = vrRender();
+ const b64 = c.toDataURL("image/jpeg", 0.85).split(",")[1];
+ const res = await scriptCall({ action: "shiftReport", name: "vuororaportti.jpg", b64: b64 });
+ if (!res || !res.ok) throw new Error((res && res.error) || "ei yhteyttä");
+ const s = res.summary || {};
+ const head = "Vuoro " + (s.shift || "?") + (s.date ? " (" + s.date + ")" : "") + ", auto " + (s.car || "?") + ": " + (s.km !== "" && s.km !== undefined ? s.km + " km" : "? km") + ", " + (s.rides !== "" && s.rides !== undefined ? s.rides : "?") + " ajoa, brutto " + (s.gross !== "" && s.gross !== undefined ? s.gross + " €" : "?");
+ const ok = res.check === "OK";
+ vrSetInfo((ok ? "✔ Tallennettu. " : "⚠ Tallennettu, mutta tarkista taulukosta. ") + head + ". " + res.check + (res.replaced ? " (päivitti aiemman rivin)" : ""), ok ? '#7ddf7d' : '#ffb74d');
+ vrState = null;
+ document.getElementById('vrPreview').style.display = 'none'; document.getElementById('btnVRRot').style.display = 'none'; btn.style.display = 'none';
+ fi.value = '';
+ } catch (e) { vrSetInfo("Tallennus epäonnistui: " + e.message + ". Kuva on vielä valittuna, yritä uudelleen.", '#ff6666'); }
+ btn.disabled = false;
+ };
+ });
  // ===== KUITTI / KUVALIITE =====
  let pendingReceipt = null; // { blob, b64, dataUrl }
  let existingReceipt = null; // { id, url, name } (muokattavan kyydin kuitti)
