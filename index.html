@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.65</title>
+ <title>Kuljetuskirja V37.66</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -66,7 +66,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.65 | Päivitetty: 29.10.2026</div>
+<div class="v-tag">V37.66 | Päivitetty: 29.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -622,13 +622,14 @@
  <td>${escapeHtml(r.customer || '-')}</td>
  <td>${phoneLink}</td>
  <td>${escapeHtml(r.orderer || '-')}</td>
- <td><span class="price-tag">${escapeHtml(r.price || '0')}€</span></td>
+ <td><span class="price-tag"${r.voided ? ' style="text-decoration:line-through;"' : ''}>${escapeHtml(r.price || '0')}€</span>${r.voided ? '<br><b>MITÄTÖITY</b>' : ''}</td>
  <td>${escapeHtml(r.billing || '-')}</td>
  <td>${escapeHtml(r.notes || '-')}</td>
- <td>${escapeHtml(r.deviation || '-')}</td>
+ <td>${escapeHtml(r.deviation || '-')}${r.voided && r.voidNote ? '<br><b>Mitätöinti: ' + escapeHtml(r.voidNote) + '</b>' : ''}</td>
  <td>
  ${receiptCell(r)}
  <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
+ <button class="action-btn" title="${r.voided ? 'Palauta voimaan' : 'Mitätöi'}" onclick="window.voidEntry('${r.id}')">${r.voided ? '↺' : '⊘'}</button>
  <button class="action-btn del-btn" onclick="window.deleteEntry('${r.id}')">X</button>
  </td>`;
  const rowDate = parseFinnishDate(r.date);
@@ -639,7 +640,10 @@
  const startMs = new Date(rowDate.getFullYear(), rowDate.getMonth(), rowDate.getDate(), +tm[1], +tm[2]).getTime();
  if (Date.now() > startMs + RIDE_GRACE_MIN * 60000) isExpired = true;
  }
- if (rowDate && !isExpired) {
+ if (r.voided) {
+ tr.style.backgroundColor = '#3a1a1a';
+ tr.style.color = '#ff9a9a';
+ } else if (rowDate && !isExpired) {
  tr.style.backgroundColor = '#2a5a2a';
  tr.style.color = '#00ff00';
  } else {
@@ -780,7 +784,35 @@
  }
  }
  };
- window.cancelEdit = () => { 
+ // Mitätöinti: rivi säilyy jäljitettävänä, mutta ei lasketa tuloksi eikä laskutukseen.
+ // Taulukkoon (Sheets) lähtee hinnaksi 0 ja selite Poikkeamat-kenttään; appiin jää alkuperäinen hinta.
+ window.voidEntry = async (id) => {
+ const r = currentLogs.find(l => l.id === id);
+ if (!r) { showError("Tilausta ei löydy"); return; }
+ try {
+ if (r.voided) {
+ if (!confirm("Palauta tilaus voimaan?")) return;
+ const dev = String(r.deviation || "").replace(/^MITÄTÖITY:[^|]*\|?\s*/, "").trim();
+ await updateDoc(doc(db, "taksitulot", id), { voided: false, voidNote: "", voidedAt: "", deviation: dev });
+ const restored = Object.assign({}, r, { voided: false, voidNote: "", voidedAt: "", deviation: dev });
+ queueSheet("upsert", Object.assign({ id: id }, sheetData(restored)));
+ return;
+ }
+ const note = prompt("Mitätöinnin selite (esim. Käteismaksu ei toteutunut, maksettu kortilla, kuitti 12895-1):", "");
+ if (note === null) return;
+ const clean = note.trim();
+ if (!clean) { showError("Selite on pakollinen mitätöinnissä"); return; }
+ const stamp = new Date().toISOString();
+ const dev = ("MITÄTÖITY: " + clean + (r.deviation ? " | " + r.deviation : "")).trim();
+ await updateDoc(doc(db, "taksitulot", id), { voided: true, voidNote: clean, voidedAt: stamp, deviation: dev });
+ const voidedRow = Object.assign({}, r, { voided: true, voidNote: clean, voidedAt: stamp, deviation: dev, price: "0" });
+ queueSheet("upsert", Object.assign({ id: id }, sheetData(voidedRow)));
+ } catch (error) {
+ showError("Mitätöintivirhe: " + error.message);
+ console.error(error);
+ }
+ };
+ window.cancelEdit = () => {
  editId = null; 
  document.getElementById('editModeIndicator').classList.remove('active'); 
  document.getElementById('btnCancel').classList.remove('show'); 
@@ -1149,6 +1181,7 @@
  const filtered = currentLogs.filter(r => {
  const d = parseFinnishDate(r.date);
  if (!d || d.getMonth() + 1 !== selM || d.getFullYear() !== selY) return false;
+ if (r.voided) return false;
  const bill = (r.billing || "").toString().trim();
  return bill !== "" && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(bill) && !/maksaa|autoon|asiakas/i.test(bill);
  });
@@ -1224,7 +1257,7 @@
  }
  };
  /* ===== Laskutettavat kyydit: esikatselu ja valinta ===== */
- const billIsBillable = (r) => { const bill = (r.billing || "").toString().trim(); return bill !== "" && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(bill) && !/maksaa|autoon|asiakas/i.test(bill); };
+ const billIsBillable = (r) => { if (r.voided) return false; const bill = (r.billing || "").toString().trim(); return bill !== "" && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(bill) && !/maksaa|autoon|asiakas/i.test(bill); };
  const billTmin = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? (+m[1]) * 60 + (+m[2]) : 0; };
  const billFmtT = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? m[1].padStart(2, '0') + ':' + m[2] : String(t || ''); };
  const billFmtD = (d) => String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
