@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.70</title>
+ <title>Kuljetuskirja V37.71</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -67,7 +67,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.70 | Päivitetty: 29.10.2026</div>
+<div class="v-tag">V37.71 | Päivitetty: 29.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -85,6 +85,7 @@
  <div class="full-width"><label>Lasku / Maksaja</label><input type="text" id="inLasku"></div>
  <div class="full-width"><label>Huomio</label><input type="text" id="inHuomio"></div>
  <div class="full-width"><label>Poikkeamat</label><input type="text" id="inPoikkeama"></div>
+ <div class="full-width"><label style="display:flex;gap:10px;align-items:center;padding:10px;border:2px solid #c5221f;border-radius:6px;color:#ff9a9a;"><input type="checkbox" id="inKorjaus" style="width:26px;height:26px;flex:none;"> <span>KORJAUS: virheellinen kuitti – Hinta-kentän summa vähennetään päivän kassasta</span></label></div>
  <div class="full-width" id="receiptBox">
   <label>Kuitti / kuva</label>
   <input type="file" id="inKuitti" accept="image/*" style="display:none">
@@ -422,6 +423,12 @@
  function sheetData(d) {
  const o = Object.assign({}, d);
  delete o.receiptUrl; delete o.receiptId; delete o.receiptName;
+ if (d.korjaus) {
+ const amt = Math.abs(parseFloat(String(d.price || '0').replace(',', '.')) || 0);
+ o.price = '0';
+ o.korjaus = -amt;
+ o.deviation = ('KORJAUS −' + amt.toFixed(2).replace('.', ',') + ' €' + (d.deviation ? ' | ' + d.deviation : '')).trim();
+ } else { o.korjaus = 0; }
  return o;
  }
  function compressImage(file) {
@@ -623,7 +630,7 @@
  <td>${escapeHtml(r.customer || '-')}</td>
  <td>${phoneLink}</td>
  <td>${escapeHtml(r.orderer || '-')}</td>
- <td><span class="price-tag"${r.voided ? ' style="text-decoration:line-through;"' : ''}>${escapeHtml(r.price || '0')}€</span>${r.voided ? '<br><b>MITÄTÖITY</b>' : ''}</td>
+ <td><span class="price-tag"${r.voided ? ' style="text-decoration:line-through;"' : ''}>${r.korjaus ? '−' : ''}${escapeHtml(r.price || '0')}€</span>${r.voided ? '<br><b>MITÄTÖITY</b>' : ''}${r.korjaus ? '<br><b>KORJAUS</b>' : ''}</td>
  <td>${escapeHtml(r.billing || '-')}</td>
  <td>${escapeHtml(r.notes || '-')}</td>
  <td>${escapeHtml(r.deviation || '-')}${r.voided && r.voidNote ? '<br><b>Mitätöinti: ' + escapeHtml(r.voidNote) + '</b>' : ''}</td>
@@ -680,7 +687,8 @@
  orderer: document.getElementById('inTilaaja').value.trim(),
  billing: document.getElementById('inLasku').value.trim(), 
  notes: document.getElementById('inHuomio').value.trim(),
- deviation: document.getElementById('inPoikkeama').value.trim()
+ deviation: document.getElementById('inPoikkeama').value.trim(),
+ korjaus: document.getElementById('inKorjaus').checked
  };
  if (!data.date) {
  showError("Päivämäärä pakollinen (pp.kk.yyyy)");
@@ -768,6 +776,7 @@
  document.getElementById('inLasku').value = r.billing || '';
  document.getElementById('inHuomio').value = r.notes || '';
  document.getElementById('inPoikkeama').value = r.deviation || '';
+ document.getElementById('inKorjaus').checked = !!r.korjaus;
  document.getElementById('editModeIndicator').classList.add('active');
  document.getElementById('btnCancel').classList.add('show');
  document.getElementById('btnSave').innerText = "PÄIVITÄ TILAUS";
@@ -821,6 +830,7 @@
  clearForm(); 
  };
  window.clearForm = () => { 
+ document.getElementById('inKorjaus').checked = false;
  document.querySelectorAll('input, textarea').forEach(i => {
  if (i.id === 'inPvm') {
  const today = new Date();
@@ -1182,7 +1192,7 @@
  const filtered = currentLogs.filter(r => {
  const d = parseFinnishDate(r.date);
  if (!d || d.getMonth() + 1 !== selM || d.getFullYear() !== selY) return false;
- if (r.voided) return false;
+ if (r.voided || r.korjaus) return false;
  const bill = (r.billing || "").toString().trim();
  return bill !== "" && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(bill) && !/maksaa|autoon|asiakas/i.test(bill);
  });
@@ -1258,7 +1268,7 @@
  }
  };
  /* ===== Laskutettavat kyydit: esikatselu ja valinta ===== */
- const billIsBillable = (r) => { if (r.voided) return false; const bill = (r.billing || "").toString().trim(); return bill !== "" && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(bill) && !/maksaa|autoon|asiakas/i.test(bill); };
+ const billIsBillable = (r) => { if (r.voided || r.korjaus) return false; const bill = (r.billing || "").toString().trim(); return bill !== "" && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(bill) && !/maksaa|autoon|asiakas/i.test(bill); };
  const billTmin = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? (+m[1]) * 60 + (+m[2]) : 0; };
  const billFmtT = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? m[1].padStart(2, '0') + ':' + m[2] : String(t || ''); };
  const billFmtD = (d) => String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
