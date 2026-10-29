@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.69</title>
+ <title>Kuljetuskirja V37.70</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -67,7 +67,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.69 | Päivitetty: 29.10.2026</div>
+<div class="v-tag">V37.70 | Päivitetty: 29.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1487,6 +1487,8 @@
  const row = ws.getRow(r++);
  [new Date(Date.UTC(dd.getFullYear(), dd.getMonth(), dd.getDate())), shiftWd[dd.getDay()], /^\d+$/.test(l.car) ? Number(l.car) : l.car, l.brutto, l.korjaus, l.alv0, l.palkkio].forEach((v, i) => {
  const c = row.getCell(i + 1); c.value = v;
+ if (i === 5) c.value = { formula: 'ROUND((D' + row.number + '+E' + row.number + ')/' + (1 + SHIFT_ALV_KASSA / 100) + ',2)', result: l.alv0 };
+ if (i === 6) c.value = { formula: 'ROUND((D' + row.number + '+E' + row.number + ')/' + (1 + SHIFT_ALV_KASSA / 100) + '*' + (SHIFT_OSUUS / 100) + ',2)', result: l.palkkio };
  c.border = { bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } } };
  if (i === 0) c.numFmt = 'd.m.yyyy';
  if (i >= 3) c.numFmt = eur;
@@ -1495,10 +1497,12 @@
  });
  });
  const tr = ws.getRow(r++);
- tr.getCell(4).value = s.brutto; tr.getCell(5).value = s.korjaus; tr.getCell(6).value = s.alv0;
+ const firstR = 5, lastR = tr.number - 1;
+ tr.getCell(4).value = { formula: 'SUM(D' + firstR + ':D' + lastR + ')', result: s.brutto }; tr.getCell(5).value = { formula: 'SUM(E' + firstR + ':E' + lastR + ')', result: s.korjaus }; tr.getCell(6).value = { formula: 'SUM(F' + firstR + ':F' + lastR + ')', result: s.alv0 };
  [4, 5, 6].forEach(i => { tr.getCell(i).numFmt = eur; });
  for (let i = 1; i <= 7; i++) { tr.getCell(i).font = i === 5 ? { bold: true, color: { argb: 'FFC5221F' } } : { bold: true }; tr.getCell(i).border = { top: { style: 'medium' } }; }
- [['Yhteensä (alv 0 %)', s.palkkio], ['Alv ' + String(SHIFT_ALV_LASKU).replace('.', ',') + ' %', s.alv], ['Laskun summa (sis. alv)', s.total]].forEach(([lab, v]) => {
+ const sumRow = r;
+ [['Yhteensä (alv 0 %)', { formula: 'SUM(G' + firstR + ':G' + lastR + ')', result: s.palkkio }], ['Alv ' + String(SHIFT_ALV_LASKU).replace('.', ',') + ' %', { formula: 'ROUND(G' + sumRow + '*' + (SHIFT_ALV_LASKU / 100) + ',2)', result: s.alv }], ['Laskun summa (sis. alv)', { formula: 'G' + sumRow + '+G' + (sumRow + 1), result: s.total }]].forEach(([lab, v]) => {
  const row = ws.getRow(r++);
  row.getCell(1).value = lab; row.getCell(1).font = { bold: true };
  const c = row.getCell(7); c.value = v; c.numFmt = eur; c.font = { bold: true };
