@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.68</title>
+ <title>Kuljetuskirja V37.69</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -40,6 +40,7 @@
  .modal-title { color: var(--accent); font-weight: bold; margin-bottom: 15px; font-size: 1.1rem; }
  .modal-field { margin-bottom: 12px; }
  .modal-field label { display: block; margin-bottom: 5px; }
+ .modal-field input[type=date] { background: #f2f2f2; color: #111; border: 2px solid #2a7de1; font-size: 1.4rem; padding: 16px 12px; min-height: 58px; color-scheme: light; caret-color: #d00; }
  .modal-field input { width: 100%; background: #000; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 4px; font-family: inherit; }
  .modal-buttons { display: flex; gap: 8px; margin-top: 15px; }
  .modal-btn { flex: 1; padding: 10px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
@@ -66,7 +67,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.68 | Päivitetty: 29.10.2026</div>
+<div class="v-tag">V37.69 | Päivitetty: 29.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -164,8 +165,8 @@
 <div class="modal-overlay" id="billModal">
  <div class="modal-box" style="max-width:520px;">
  <div class="modal-title">Laskutettavat kyydit (Excel)</div>
- <div class="modal-field"><label>Alkupäivä (pp.kk.yyyy)</label><input type="text" id="billFrom" placeholder="12.10.2026"></div>
- <div class="modal-field"><label>Loppupäivä (pp.kk.yyyy)</label><input type="text" id="billTo" placeholder="18.10.2026"></div>
+ <div class="modal-field"><label>Alkupäivä</label><input type="date" id="billFrom"></div>
+ <div class="modal-field"><label>Loppupäivä</label><input type="date" id="billTo"></div>
  <div class="modal-buttons" style="margin-top:0;"><button class="modal-btn ok" onclick="loadBillRides()">HAE KYYDIT</button></div>
  <div class="modal-field" id="billList" style="margin-top:12px;"></div>
  <div class="modal-field" id="billSummary" style="display:none; border-top:1px solid #555; padding-top:8px;"></div>
@@ -179,8 +180,8 @@
 <div class="modal-overlay" id="shiftModal">
  <div class="modal-box" style="max-width:520px;">
  <div class="modal-title">Laskuliite: ajovuorot (Taksipalvelu Simonen)</div>
- <div class="modal-field"><label>Alkupäivä (pp.kk.yyyy)</label><input type="text" id="shiftFrom" placeholder="12.10.2026"></div>
- <div class="modal-field"><label>Loppupäivä (pp.kk.yyyy)</label><input type="text" id="shiftTo" placeholder="23.10.2026"></div>
+ <div class="modal-field"><label>Alkupäivä</label><input type="date" id="shiftFrom"></div>
+ <div class="modal-field"><label>Loppupäivä</label><input type="date" id="shiftTo"></div>
  <div class="modal-buttons" style="margin-top:0;"><button class="modal-btn ok" onclick="loadShifts()">HAE VUOROT</button></div>
  <div class="modal-field" id="shiftList" style="margin-top:12px;"></div>
  <div class="modal-field" id="shiftSummary" style="display:none; border-top:1px solid #555; padding-top:8px;"></div>
@@ -1267,8 +1268,8 @@
  const today = new Date();
  const mon = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7) - 7);
  const sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
- document.getElementById('billFrom').value = billFmtD(mon);
- document.getElementById('billTo').value = billFmtD(sun);
+ document.getElementById('billFrom').value = mon.getFullYear() + '-' + String(mon.getMonth() + 1).padStart(2, '0') + '-' + String(mon.getDate()).padStart(2, '0');
+ document.getElementById('billTo').value = sun.getFullYear() + '-' + String(sun.getMonth() + 1).padStart(2, '0') + '-' + String(sun.getDate()).padStart(2, '0');
  billRows = [];
  renderBillList();
  document.getElementById('billModal').classList.add('active');
@@ -1277,8 +1278,8 @@
  const billMsg = (t) => { const el = document.getElementById('billMsg'); el.textContent = t || ''; el.style.display = t ? 'block' : 'none'; };
  window.loadBillRides = async () => {
  billMsg('');
- const f = parseFinnishDate(document.getElementById('billFrom').value.trim());
- const t = parseFinnishDate(document.getElementById('billTo').value.trim());
+ const f = dateInputVal('billFrom');
+ const t = dateInputVal('billTo');
  if (!f || !t || f > t) { billMsg('Anna alku- ja loppupäivä muodossa pp.kk.vvvv'); return; }
  const rides = currentLogs.filter(r => { const d = parseFinnishDate(r.date); return d && d >= f && d <= t && billIsBillable(r); });
  let sheetPrices = {}, sheetOk = true;
@@ -1402,18 +1403,19 @@
  window.openShiftModal = () => {
  const today = new Date();
  const mon = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7) - 7);
- document.getElementById('shiftFrom').value = shiftFmt(mon);
- document.getElementById('shiftTo').value = shiftFmt(today);
+ document.getElementById('shiftFrom').value = shiftIso(mon);
+ document.getElementById('shiftTo').value = shiftIso(today);
  shiftRows = [];
  renderShiftList();
  document.getElementById('shiftModal').classList.add('active');
  };
  window.closeShiftModal = () => document.getElementById('shiftModal').classList.remove('active');
  const shiftMsg = (t) => { const el = document.getElementById('shiftMsg'); el.textContent = t || ''; el.style.display = t ? 'block' : 'none'; };
+ const dateInputVal = (id) => { const v = document.getElementById(id).value.trim(); const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : parseFinnishDate(v); };
  window.loadShifts = async () => {
  shiftMsg('');
- const f = parseFinnishDate(document.getElementById('shiftFrom').value.trim());
- const t = parseFinnishDate(document.getElementById('shiftTo').value.trim());
+ const f = dateInputVal('shiftFrom');
+ const t = dateInputVal('shiftTo');
  if (!f || !t || f > t) { shiftMsg('Anna alku- ja loppupäivä muodossa pp.kk.vvvv'); return; }
  try {
  const idToken = await auth.currentUser.getIdToken();
