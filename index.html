@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.71</title>
+ <title>Kuljetuskirja V37.72</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -67,7 +67,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.71 | Päivitetty: 29.10.2026</div>
+<div class="v-tag">V37.72 | Päivitetty: 29.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1474,10 +1474,10 @@
  const fname = 'erittely_ajovuorot_' + sel[0].date + '_' + sel[sel.length - 1].date;
  const saveBlob = (blob, name) => { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 100); };
  const csvFallback = () => {
- let csv = '﻿Pvm;Pv;Auto;Bruttokassa;Korjaus;Kassa alv 0 %;Palkkio 55 %\n';
- s.lines.forEach(l => { const dd = shiftIsoToDate(l.date); csv += [shiftFmt(dd), shiftWd[dd.getDay()], l.car, l.brutto.toFixed(2).replace('.', ','), l.korjaus.toFixed(2).replace('.', ','), l.alv0.toFixed(2).replace('.', ','), l.palkkio.toFixed(2).replace('.', ',')].join(';') + '\n'; });
- csv += ';;Yhteensä;' + s.brutto.toFixed(2).replace('.', ',') + ';' + s.korjaus.toFixed(2).replace('.', ',') + ';' + s.alv0.toFixed(2).replace('.', ',') + ';' + s.palkkio.toFixed(2).replace('.', ',') + '\n';
- csv += ';;Alv ' + SHIFT_ALV_LASKU + ' %;;;;' + s.alv.toFixed(2).replace('.', ',') + '\n;;Laskun summa;;;;' + s.total.toFixed(2).replace('.', ',') + '\n';
+ let csv = '﻿Pvm;Pv;Auto;Bruttokassa;Korjaus;Korjattu brutto;Kassa alv 0 %;Palkkio 55 %\n';
+ s.lines.forEach(l => { const dd = shiftIsoToDate(l.date); csv += [shiftFmt(dd), shiftWd[dd.getDay()], l.car, l.brutto.toFixed(2).replace('.', ','), l.korjaus.toFixed(2).replace('.', ','), (l.brutto + l.korjaus).toFixed(2).replace('.', ','), l.alv0.toFixed(2).replace('.', ','), l.palkkio.toFixed(2).replace('.', ',')].join(';') + '\n'; });
+ csv += ';;Yhteensä;' + s.brutto.toFixed(2).replace('.', ',') + ';' + s.korjaus.toFixed(2).replace('.', ',') + ';' + (s.brutto + s.korjaus).toFixed(2).replace('.', ',') + ';' + s.alv0.toFixed(2).replace('.', ',') + ';' + s.palkkio.toFixed(2).replace('.', ',') + '\n';
+ csv += ';;Alv ' + SHIFT_ALV_LASKU + ' %;;;;;' + s.alv.toFixed(2).replace('.', ',') + '\n;;Laskun summa;;;;;' + s.total.toFixed(2).replace('.', ',') + '\n';
  saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), fname + '.csv');
  };
  const makeXlsx = async () => {
@@ -1488,17 +1488,18 @@
  ws.getCell('A1').font = { bold: true, size: 14 };
  ws.getCell('A2').value = 'Laskuttaja: AJarmo Oy  ·  Laskutettava: Taksipalvelu Simonen';
  ws.getCell('A2').font = { color: { argb: 'FF555555' } };
- const hdr = ['Pvm', 'Pv', 'Auto', 'Bruttokassa (sis. alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %)', 'Korjaus', 'Kassa alv 0 %', 'Palkkio ' + SHIFT_OSUUS + ' %'];
+ const hdr = ['Pvm', 'Pv', 'Auto', 'Bruttokassa (sis. alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %)', 'Korjaus', 'Korjattu brutto', 'Kassa alv 0 %', 'Palkkio ' + SHIFT_OSUUS + ' %'];
  const hr = ws.getRow(4); hr.height = 32;
  hdr.forEach((h, i) => { const c = hr.getCell(i + 1); c.value = h; c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i === 4 ? 'FFC5221F' : 'FF1F3A5F' } }; c.alignment = { wrapText: true, horizontal: 'center', vertical: 'middle' }; });
  let r = 5;
  s.lines.forEach(l => {
  const dd = shiftIsoToDate(l.date);
  const row = ws.getRow(r++);
- [new Date(Date.UTC(dd.getFullYear(), dd.getMonth(), dd.getDate())), shiftWd[dd.getDay()], /^\d+$/.test(l.car) ? Number(l.car) : l.car, l.brutto, l.korjaus, l.alv0, l.palkkio].forEach((v, i) => {
+ [new Date(Date.UTC(dd.getFullYear(), dd.getMonth(), dd.getDate())), shiftWd[dd.getDay()], /^\d+$/.test(l.car) ? Number(l.car) : l.car, l.brutto, l.korjaus, shiftR2(l.brutto + l.korjaus), l.alv0, l.palkkio].forEach((v, i) => {
  const c = row.getCell(i + 1); c.value = v;
- if (i === 5) c.value = { formula: 'ROUND((D' + row.number + '+E' + row.number + ')/' + (1 + SHIFT_ALV_KASSA / 100) + ',2)', result: l.alv0 };
- if (i === 6) c.value = { formula: 'ROUND((D' + row.number + '+E' + row.number + ')/' + (1 + SHIFT_ALV_KASSA / 100) + '*' + (SHIFT_OSUUS / 100) + ',2)', result: l.palkkio };
+ if (i === 5) c.value = { formula: 'D' + row.number + '+E' + row.number, result: shiftR2(l.brutto + l.korjaus) };
+ if (i === 6) c.value = { formula: 'ROUND(F' + row.number + '/' + (1 + SHIFT_ALV_KASSA / 100) + ',2)', result: l.alv0 };
+ if (i === 7) c.value = { formula: 'ROUND(F' + row.number + '/' + (1 + SHIFT_ALV_KASSA / 100) + '*' + (SHIFT_OSUUS / 100) + ',2)', result: l.palkkio };
  c.border = { bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } } };
  if (i === 0) c.numFmt = 'd.m.yyyy';
  if (i >= 3) c.numFmt = eur;
@@ -1508,19 +1509,19 @@
  });
  const tr = ws.getRow(r++);
  const firstR = 5, lastR = tr.number - 1;
- tr.getCell(4).value = { formula: 'SUM(D' + firstR + ':D' + lastR + ')', result: s.brutto }; tr.getCell(5).value = { formula: 'SUM(E' + firstR + ':E' + lastR + ')', result: s.korjaus }; tr.getCell(6).value = { formula: 'SUM(F' + firstR + ':F' + lastR + ')', result: s.alv0 };
- [4, 5, 6].forEach(i => { tr.getCell(i).numFmt = eur; });
- for (let i = 1; i <= 7; i++) { tr.getCell(i).font = i === 5 ? { bold: true, color: { argb: 'FFC5221F' } } : { bold: true }; tr.getCell(i).border = { top: { style: 'medium' } }; }
+ tr.getCell(4).value = { formula: 'SUM(D' + firstR + ':D' + lastR + ')', result: s.brutto }; tr.getCell(5).value = { formula: 'SUM(E' + firstR + ':E' + lastR + ')', result: s.korjaus }; tr.getCell(6).value = { formula: 'SUM(F' + firstR + ':F' + lastR + ')', result: shiftR2(s.brutto + s.korjaus) }; tr.getCell(7).value = { formula: 'SUM(G' + firstR + ':G' + lastR + ')', result: s.alv0 };
+ [4, 5, 6, 7].forEach(i => { tr.getCell(i).numFmt = eur; });
+ for (let i = 1; i <= 8; i++) { tr.getCell(i).font = i === 5 ? { bold: true, color: { argb: 'FFC5221F' } } : { bold: true }; tr.getCell(i).border = { top: { style: 'medium' } }; }
  const sumRow = r;
- [['Yhteensä (alv 0 %)', { formula: 'SUM(G' + firstR + ':G' + lastR + ')', result: s.palkkio }], ['Alv ' + String(SHIFT_ALV_LASKU).replace('.', ',') + ' %', { formula: 'ROUND(G' + sumRow + '*' + (SHIFT_ALV_LASKU / 100) + ',2)', result: s.alv }], ['Laskun summa (sis. alv)', { formula: 'G' + sumRow + '+G' + (sumRow + 1), result: s.total }]].forEach(([lab, v]) => {
+ [['Yhteensä (alv 0 %)', { formula: 'SUM(H' + firstR + ':H' + lastR + ')', result: s.palkkio }], ['Alv ' + String(SHIFT_ALV_LASKU).replace('.', ',') + ' %', { formula: 'ROUND(H' + sumRow + '*' + (SHIFT_ALV_LASKU / 100) + ',2)', result: s.alv }], ['Laskun summa (sis. alv)', { formula: 'H' + sumRow + '+H' + (sumRow + 1), result: s.total }]].forEach(([lab, v]) => {
  const row = ws.getRow(r++);
  row.getCell(1).value = lab; row.getCell(1).font = { bold: true };
- const c = row.getCell(7); c.value = v; c.numFmt = eur; c.font = { bold: true };
+ const c = row.getCell(8); c.value = v; c.numFmt = eur; c.font = { bold: true };
  });
  r++;
- ws.getCell('A' + r).value = 'Palkkio = (päivän bruttokassa + korjaus) ÷ ' + (1 + SHIFT_ALV_KASSA / 100).toFixed(3).replace('.', ',') + ' × ' + SHIFT_OSUUS + ' %. Kassa on päivän kassasumma, johon sisältyy alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %.';
+ ws.getCell('A' + r).value = 'Korjattu brutto = bruttokassa + korjaus. Palkkio = korjattu brutto ÷ ' + (1 + SHIFT_ALV_KASSA / 100).toFixed(3).replace('.', ',') + ' × ' + SHIFT_OSUUS + ' %. Kassa on päivän kassasumma, johon sisältyy alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %.';
  ws.getCell('A' + r).font = { italic: true, color: { argb: 'FF555555' } };
- [11, 5, 7, 22, 12, 14, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+ [11, 5, 7, 22, 12, 16, 14, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
  ws.pageSetup = { orientation: 'landscape', fitToPage: true };
  const buf = await wb.xlsx.writeBuffer();
  saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fname + '.xlsx');
