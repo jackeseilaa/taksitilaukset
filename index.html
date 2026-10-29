@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.64</title>
+ <title>Kuljetuskirja V37.65</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -66,7 +66,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.64 | Päivitetty: 29.10.2026</div>
+<div class="v-tag">V37.65 | Päivitetty: 29.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -107,6 +107,16 @@
  <button class="btn-csv export-subscriber" onclick="openShiftModal()">LASKULIITE: AJOVUOROT (EXCEL)</button>
  <button class="btn-csv" id="btnClear" onclick="clearForm()" style="background: #3a2a2a;">TYHJENNÄ</button>
  <button class="btn-cancel" id="btnCancel" onclick="cancelEdit()">PERUUTA MUOKKAUS</button>
+</div>
+<div id="smbTimes" style="display:none;border:1px solid #444;border-radius:8px;padding:10px;margin:8px 0;">
+ <div style="font-size:0.9rem;color:#ccc;margin-bottom:6px;">Vuoron ajat (<span id="smbTimesCar">SMB</span>, tänään)</div>
+ <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+  <div><label style="font-size:0.8rem;color:#aaa;">Alku</label><input type="time" id="smbStart"></div>
+  <div><label style="font-size:0.8rem;color:#aaa;">Loppu</label><input type="time" id="smbEnd"></div>
+  <button type="button" class="btn-csv" id="btnSmbTimes" style="background:#2a4a2a;">TALLENNA AJAT</button>
+  <button type="button" class="btn-csv" id="btnSmbClose" style="background:#3a2a2a;">SULJE</button>
+ </div>
+ <div id="smbTimesInfo" style="margin-top:6px;font-size:0.85rem;color:#aaa;"></div>
 </div>
  <div class="full-width" id="vrBox" style="border:1px solid #444;border-radius:8px;padding:10px;margin:12px 0;">
  <label>Vuororaportti (kuva tallentuu Driveen ja luvut taulukon Vuororaportit-välilehdelle)</label>
@@ -1476,6 +1486,21 @@
  document.getElementById('btnSetSMB').onclick = () => {
  document.getElementById('inAuto').value = "SMB"; 
  document.getElementById('inPvm').value = new Date().toLocaleDateString('fi-FI'); 
+ document.getElementById('smbTimesInfo').textContent = "";
+ document.getElementById('smbTimes').style.display = 'block';
+ };
+ document.getElementById('btnSmbClose').onclick = () => { document.getElementById('smbTimes').style.display = 'none'; };
+ document.getElementById('btnSmbTimes').onclick = async () => {
+ const info = document.getElementById('smbTimesInfo');
+ const st = document.getElementById('smbStart').value, en = document.getElementById('smbEnd').value;
+ if (!st && !en) { info.style.color = '#e8a33d'; info.textContent = 'Anna alku- tai loppuaika.'; return; }
+ const t = new Date(), iso = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+ info.style.color = '#aaa'; info.textContent = 'Tallennetaan…';
+ try {
+ const res = await scriptCall({ action: 'shiftTimes', date: iso, car: document.getElementById('inAuto').value.trim() || 'SMB', start: st, end: en });
+ if (res && res.ok) { info.style.color = '#6fcf6f'; info.textContent = 'Tallennettu: ' + (res.msg || ''); }
+ else { info.style.color = '#e8a33d'; info.textContent = (res && res.error) ? res.error : 'Tallennus ei onnistunut.'; }
+ } catch (e) { info.style.color = '#e8a33d'; info.textContent = 'Virhe: ' + e.message; }
  };
  window.downloadAllCSV = () => {
  console.log("📥 Ladataan KAIKKI CSV, currentLogs.length =", currentLogs.length);
