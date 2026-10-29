@@ -1389,14 +1389,15 @@
  let shiftRows = [];
  window.buildShiftSummary = (rows) => {
  const lines = rows.map(r => {
- const a0 = shiftR2(r.brutto / (1 + SHIFT_ALV_KASSA / 100));
- const p = shiftR2(r.brutto / (1 + SHIFT_ALV_KASSA / 100) * (SHIFT_OSUUS / 100));
- return { date: r.date, car: r.car, brutto: r.brutto, alv0: a0, palkkio: p };
+ const kor = r.korjaus || 0, eff = r.brutto + kor;
+ const a0 = shiftR2(eff / (1 + SHIFT_ALV_KASSA / 100));
+ const p = shiftR2(eff / (1 + SHIFT_ALV_KASSA / 100) * (SHIFT_OSUUS / 100));
+ return { date: r.date, car: r.car, brutto: r.brutto, korjaus: kor, alv0: a0, palkkio: p };
  });
  const sum = (k) => shiftR2(lines.reduce((a, l) => a + l[k], 0));
  const palkkio = sum('palkkio');
  const alv = shiftR2(palkkio * SHIFT_ALV_LASKU / 100);
- return { lines, brutto: sum('brutto'), alv0: sum('alv0'), palkkio, alv, total: shiftR2(palkkio + alv) };
+ return { lines, brutto: sum('brutto'), korjaus: sum('korjaus'), alv0: sum('alv0'), palkkio, alv, total: shiftR2(palkkio + alv) };
  };
  window.openShiftModal = () => {
  const today = new Date();
@@ -1419,7 +1420,7 @@
  const resp = await fetch(SHEET_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'shifts', idToken: idToken, from: shiftIso(f), to: shiftIso(t) }) });
  const jr = await resp.json();
  if (!jr || !jr.ok || !Array.isArray(jr.shifts)) { shiftMsg('Sheets ei palauttanut vuoroja' + (jr && jr.error ? ': ' + jr.error : '') + '.'); return; }
- shiftRows = jr.shifts.map(s => ({ date: s.date, car: String(s.car || ''), brutto: Number(s.brutto) || 0, start: s.start || '', end: s.end || '', billed: s.billed || '', on: (Number(s.brutto) || 0) > 0 && !s.billed }));
+ shiftRows = jr.shifts.map(s => ({ date: s.date, car: String(s.car || ''), brutto: Number(s.brutto) || 0, korjaus: Number(s.korjaus) || 0, start: s.start || '', end: s.end || '', billed: s.billed || '', on: (Number(s.brutto) || 0) > 0 && !s.billed }));
  if (shiftRows.length === 0) shiftMsg('Ei ajovuoroja valitulla aikavälillä.');
  renderShiftList();
  } catch (e) { console.error(e); shiftMsg('Haku epäonnistui: ' + e.message); }
@@ -1435,7 +1436,7 @@
  cb.type = 'checkbox'; cb.checked = r.on; cb.style.width = 'auto';
  cb.onchange = () => { r.on = cb.checked; renderShiftSummary(); };
  const txt = document.createElement('span');
- let s = shiftWd[d.getDay()] + ' ' + shiftFmt(d).slice(0, 5) + ' · auto ' + r.car + ' · ' + (r.start || '?') + '–' + (r.end || '?') + ' · ' + shiftEur(r.brutto);
+ let s = shiftWd[d.getDay()] + ' ' + shiftFmt(d).slice(0, 5) + ' · auto ' + r.car + ' · ' + (r.start || '?') + '–' + (r.end || '?') + ' · ' + shiftEur(r.brutto) + (r.korjaus ? ' · korjaus ' + shiftEur(r.korjaus) : '');
  if (r.brutto <= 0) s += ' ⚠ ei kassaa';
  if (r.billed) s += ' (laskutettu: ' + r.billed + ')';
  txt.textContent = s;
@@ -1450,7 +1451,7 @@
  if (sel.length === 0) { box.style.display = 'none'; return; }
  const s = buildShiftSummary(sel);
  box.style.display = 'block';
- box.textContent = 'Valittu ' + sel.length + ' vuoroa · bruttokassa ' + shiftEur(s.brutto) + ' · palkkio (alv 0 %) ' + shiftEur(s.palkkio) + ' · alv ' + SHIFT_ALV_LASKU.toString().replace('.', ',') + ' % ' + shiftEur(s.alv) + ' · laskun summa ' + shiftEur(s.total);
+ box.textContent = 'Valittu ' + sel.length + ' vuoroa · bruttokassa ' + shiftEur(s.brutto) + (s.korjaus ? ' · korjaus ' + shiftEur(s.korjaus) : '') + ' · palkkio (alv 0 %) ' + shiftEur(s.palkkio) + ' · alv ' + SHIFT_ALV_LASKU.toString().replace('.', ',') + ' % ' + shiftEur(s.alv) + ' · laskun summa ' + shiftEur(s.total);
  };
  window.downloadShiftXlsx = async () => {
  try {
@@ -1461,10 +1462,10 @@
  const fname = 'erittely_ajovuorot_' + sel[0].date + '_' + sel[sel.length - 1].date;
  const saveBlob = (blob, name) => { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 100); };
  const csvFallback = () => {
- let csv = '﻿Pvm;Pv;Auto;Bruttokassa;Kassa alv 0 %;Palkkio 55 %\n';
- s.lines.forEach(l => { const dd = shiftIsoToDate(l.date); csv += [shiftFmt(dd), shiftWd[dd.getDay()], l.car, l.brutto.toFixed(2).replace('.', ','), l.alv0.toFixed(2).replace('.', ','), l.palkkio.toFixed(2).replace('.', ',')].join(';') + '\n'; });
- csv += ';;Yhteensä;' + s.brutto.toFixed(2).replace('.', ',') + ';' + s.alv0.toFixed(2).replace('.', ',') + ';' + s.palkkio.toFixed(2).replace('.', ',') + '\n';
- csv += ';;Alv ' + SHIFT_ALV_LASKU + ' %;;;' + s.alv.toFixed(2).replace('.', ',') + '\n;;Laskun summa;;;' + s.total.toFixed(2).replace('.', ',') + '\n';
+ let csv = '﻿Pvm;Pv;Auto;Bruttokassa;Korjaus;Kassa alv 0 %;Palkkio 55 %\n';
+ s.lines.forEach(l => { const dd = shiftIsoToDate(l.date); csv += [shiftFmt(dd), shiftWd[dd.getDay()], l.car, l.brutto.toFixed(2).replace('.', ','), l.korjaus.toFixed(2).replace('.', ','), l.alv0.toFixed(2).replace('.', ','), l.palkkio.toFixed(2).replace('.', ',')].join(';') + '\n'; });
+ csv += ';;Yhteensä;' + s.brutto.toFixed(2).replace('.', ',') + ';' + s.korjaus.toFixed(2).replace('.', ',') + ';' + s.alv0.toFixed(2).replace('.', ',') + ';' + s.palkkio.toFixed(2).replace('.', ',') + '\n';
+ csv += ';;Alv ' + SHIFT_ALV_LASKU + ' %;;;;' + s.alv.toFixed(2).replace('.', ',') + '\n;;Laskun summa;;;;' + s.total.toFixed(2).replace('.', ',') + '\n';
  saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), fname + '.csv');
  };
  const makeXlsx = async () => {
@@ -1475,34 +1476,35 @@
  ws.getCell('A1').font = { bold: true, size: 14 };
  ws.getCell('A2').value = 'Laskuttaja: AJarmo Oy  ·  Laskutettava: Taksipalvelu Simonen';
  ws.getCell('A2').font = { color: { argb: 'FF555555' } };
- const hdr = ['Pvm', 'Pv', 'Auto', 'Bruttokassa (sis. alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %)', 'Kassa alv 0 %', 'Palkkio ' + SHIFT_OSUUS + ' %'];
+ const hdr = ['Pvm', 'Pv', 'Auto', 'Bruttokassa (sis. alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %)', 'Korjaus', 'Kassa alv 0 %', 'Palkkio ' + SHIFT_OSUUS + ' %'];
  const hr = ws.getRow(4); hr.height = 32;
- hdr.forEach((h, i) => { const c = hr.getCell(i + 1); c.value = h; c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3A5F' } }; c.alignment = { wrapText: true, horizontal: 'center', vertical: 'middle' }; });
+ hdr.forEach((h, i) => { const c = hr.getCell(i + 1); c.value = h; c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i === 3 ? 'FFC5221F' : 'FF1F3A5F' } }; c.alignment = { wrapText: true, horizontal: 'center', vertical: 'middle' }; });
  let r = 5;
  s.lines.forEach(l => {
  const dd = shiftIsoToDate(l.date);
  const row = ws.getRow(r++);
- [new Date(Date.UTC(dd.getFullYear(), dd.getMonth(), dd.getDate())), shiftWd[dd.getDay()], /^\d+$/.test(l.car) ? Number(l.car) : l.car, l.brutto, l.alv0, l.palkkio].forEach((v, i) => {
+ [new Date(Date.UTC(dd.getFullYear(), dd.getMonth(), dd.getDate())), shiftWd[dd.getDay()], /^\d+$/.test(l.car) ? Number(l.car) : l.car, l.brutto, l.korjaus, l.alv0, l.palkkio].forEach((v, i) => {
  const c = row.getCell(i + 1); c.value = v;
  c.border = { bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } } };
  if (i === 0) c.numFmt = 'd.m.yyyy';
  if (i >= 3) c.numFmt = eur;
  if (i === 1 || i === 2) c.alignment = { horizontal: 'center' };
+ if (i === 3) c.font = { color: { argb: 'FFC5221F' } };
  });
  });
  const tr = ws.getRow(r++);
- tr.getCell(4).value = s.brutto; tr.getCell(5).value = s.alv0;
- [4, 5].forEach(i => { tr.getCell(i).numFmt = eur; });
- for (let i = 1; i <= 6; i++) { tr.getCell(i).font = { bold: true }; tr.getCell(i).border = { top: { style: 'medium' } }; }
+ tr.getCell(4).value = s.brutto; tr.getCell(5).value = s.korjaus; tr.getCell(6).value = s.alv0;
+ [4, 5, 6].forEach(i => { tr.getCell(i).numFmt = eur; });
+ for (let i = 1; i <= 7; i++) { tr.getCell(i).font = i === 5 ? { bold: true, color: { argb: 'FFC5221F' } } : { bold: true }; tr.getCell(i).border = { top: { style: 'medium' } }; }
  [['Yhteensä (alv 0 %)', s.palkkio], ['Alv ' + String(SHIFT_ALV_LASKU).replace('.', ',') + ' %', s.alv], ['Laskun summa (sis. alv)', s.total]].forEach(([lab, v]) => {
  const row = ws.getRow(r++);
  row.getCell(1).value = lab; row.getCell(1).font = { bold: true };
- const c = row.getCell(6); c.value = v; c.numFmt = eur; c.font = { bold: true };
+ const c = row.getCell(7); c.value = v; c.numFmt = eur; c.font = { bold: true };
  });
  r++;
- ws.getCell('A' + r).value = 'Palkkio = päivän bruttokassa ÷ ' + (1 + SHIFT_ALV_KASSA / 100).toFixed(3).replace('.', ',') + ' × ' + SHIFT_OSUUS + ' %. Kassa on päivän kassasumma, johon sisältyy alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %.';
+ ws.getCell('A' + r).value = 'Palkkio = (päivän bruttokassa + korjaus) ÷ ' + (1 + SHIFT_ALV_KASSA / 100).toFixed(3).replace('.', ',') + ' × ' + SHIFT_OSUUS + ' %. Kassa on päivän kassasumma, johon sisältyy alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %.';
  ws.getCell('A' + r).font = { italic: true, color: { argb: 'FF555555' } };
- [11, 5, 7, 22, 14, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+ [11, 5, 7, 22, 12, 14, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
  ws.pageSetup = { orientation: 'landscape', fitToPage: true };
  const buf = await wb.xlsx.writeBuffer();
  saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fname + '.xlsx');
