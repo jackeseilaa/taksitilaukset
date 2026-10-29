@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.67</title>
+ <title>Kuljetuskirja V37.68</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -66,7 +66,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.67 | Päivitetty: 29.10.2026</div>
+<div class="v-tag">V37.68 | Päivitetty: 29.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1478,7 +1478,7 @@
  ws.getCell('A2').font = { color: { argb: 'FF555555' } };
  const hdr = ['Pvm', 'Pv', 'Auto', 'Bruttokassa (sis. alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %)', 'Korjaus', 'Kassa alv 0 %', 'Palkkio ' + SHIFT_OSUUS + ' %'];
  const hr = ws.getRow(4); hr.height = 32;
- hdr.forEach((h, i) => { const c = hr.getCell(i + 1); c.value = h; c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i === 3 ? 'FFC5221F' : 'FF1F3A5F' } }; c.alignment = { wrapText: true, horizontal: 'center', vertical: 'middle' }; });
+ hdr.forEach((h, i) => { const c = hr.getCell(i + 1); c.value = h; c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i === 4 ? 'FFC5221F' : 'FF1F3A5F' } }; c.alignment = { wrapText: true, horizontal: 'center', vertical: 'middle' }; });
  let r = 5;
  s.lines.forEach(l => {
  const dd = shiftIsoToDate(l.date);
@@ -1489,7 +1489,7 @@
  if (i === 0) c.numFmt = 'd.m.yyyy';
  if (i >= 3) c.numFmt = eur;
  if (i === 1 || i === 2) c.alignment = { horizontal: 'center' };
- if (i === 3) c.font = { color: { argb: 'FFC5221F' } };
+ if (i === 4) c.font = { color: { argb: 'FFC5221F' } };
  });
  });
  const tr = ws.getRow(r++);
