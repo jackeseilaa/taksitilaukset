@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.72</title>
+ <title>Kuljetuskirja V37.73</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -67,7 +67,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.72 | Päivitetty: 29.10.2026</div>
+<div class="v-tag">V37.73 | Päivitetty: 29.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1535,6 +1535,28 @@
  } catch (e) { console.error(e); shiftMsg('Excelin teko epäonnistui: ' + e.message); }
  };
  /* ===== /Laskuliite ===== */
+ /* Päivämääräkentät aukeavat kalenterina (arvo säilyy muodossa pp.kk.vvvv) */
+ function attachDatePicker(id) {
+ const el = document.getElementById(id);
+ if (!el) return;
+ el.readOnly = true; el.style.cursor = 'pointer';
+ const wrap = document.createElement('div');
+ wrap.style.cssText = 'position:relative;display:block;';
+ el.parentNode.insertBefore(wrap, el); wrap.appendChild(el);
+ const dp = document.createElement('input');
+ dp.type = 'date';
+ dp.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;';
+ wrap.appendChild(dp);
+ dp.addEventListener('pointerdown', () => {
+ const m = el.value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+ dp.value = m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : '';
+ });
+ dp.addEventListener('change', () => {
+ const m = dp.value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+ if (m) { el.value = m[3] + '.' + m[2] + '.' + m[1]; el.dispatchEvent(new Event('input', { bubbles: true })); }
+ });
+ }
+ ['inPvm', 'singleDate', 'rangeStart', 'rangeEnd'].forEach(attachDatePicker);
  document.getElementById('btnSetSMB').onclick = () => {
  document.getElementById('inAuto').value = "SMB"; 
  document.getElementById('inPvm').value = new Date().toLocaleDateString('fi-FI'); 
