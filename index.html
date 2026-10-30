@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.73</title>
+ <title>Kuljetuskirja V37.74</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -67,7 +67,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.73 | Päivitetty: 29.10.2026</div>
+<div class="v-tag">V37.74 | Päivitetty: 30.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -195,6 +195,10 @@
 </div>
 <div style="text-align: center; color: #c8f050; font-size: 0.9rem; margin-bottom: 10px; font-weight: bold;">
  📊 Ladattu: <span id="dataCount">0</span> tilausta Firestore:sta
+</div>
+<div style="display:flex;gap:6px;margin:0 0 10px 0;align-items:center;">
+ <input type="search" id="searchBox" placeholder="🔍 Etsi: asiakas, reitti, osoite, tilaus-ID, summa, korjaus, mitätöity…" autocomplete="off" style="flex:1;font-size:1.1rem;padding:10px;border-radius:8px;border:2px solid #c8f050;background:#111;color:#fff;min-width:0;">
+ <button class="action-btn" id="searchClear" title="Tyhjennä haku" style="display:none;font-size:1.1rem;">✕</button>
 </div>
 <div class="table-wrapper">
  <table>
@@ -604,20 +608,31 @@
  console.log("🔧 Firestore listener asetettu, odotetaan dataa...");
  const RIDE_GRACE_MIN = 60;
  setInterval(() => { if (currentLogs && currentLogs.length) renderTable(); }, 60000);
+ (function () {
+ const sb = document.getElementById('searchBox'), sc = document.getElementById('searchClear');
+ let tmr = null;
+ if (sb) sb.addEventListener('input', () => { clearTimeout(tmr); tmr = setTimeout(() => { if (typeof currentLogs !== 'undefined') renderTable(); }, 150); });
+ if (sc) sc.addEventListener('click', () => { sb.value = ''; renderTable(); sb.focus(); });
+ })();
  function renderTable() {
  console.log("🎨 renderTable() kutsuttu, currentLogs.length =", currentLogs.length);
  document.getElementById('dataCount').textContent = currentLogs.length;
+ const q = (document.getElementById('searchBox') ? document.getElementById('searchBox').value : '').trim().toLowerCase();
+ const terms = q ? q.split(/\s+/) : [];
+ const hay = (r) => [r.id, r.date, r.time, r.car, r.from, r.to, r.customer, r.phone, r.orderer, r.price, String(r.price || '').replace('.', ','), r.billing, r.notes, r.deviation, r.voidNote, r.voided ? 'mitätöity mitätöinti' : '', r.korjaus ? 'korjaus virheellinen kuitti' : ''].join(' ').toLowerCase();
  const today = new Date();
  today.setHours(0,0,0,0);
  const tbody = document.getElementById('logs');
  tbody.innerHTML = '';
- const sorted = [...currentLogs].sort((a, b) => {
+ const sc = document.getElementById('searchClear'); if (sc) sc.style.display = terms.length ? '' : 'none';
+ const sorted = currentLogs.filter(r => { if (!terms.length) return true; const h = hay(r); return terms.every(t => h.indexOf(t) >= 0); }).sort((a, b) => {
  const dateA = parseFinnishDate(a.date);
  const dateB = parseFinnishDate(b.date);
  if (!dateA || !dateB) return 0;
  if (dateB - dateA !== 0) return dateB - dateA;
  return (b.time || '').localeCompare(a.time || '');
  });
+ if (terms.length) document.getElementById('dataCount').textContent = sorted.length + ' / ' + currentLogs.length;
  sorted.forEach(r => {
  const tr = document.createElement('tr');
  const phoneLink = r.phone ? `<a href="tel:${escapeHtml(r.phone)}">${escapeHtml(r.phone)}</a>` : '-';
