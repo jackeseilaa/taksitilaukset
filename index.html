@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.74</title>
+ <title>Kuljetuskirja V37.75</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -22,7 +22,9 @@
  .edit-mode-indicator.active { display: block; }
  textarea { width: 100%; background: var(--surface); border: 2px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: inherit; margin-bottom: 10px; min-height: 100px; font-size: 1rem; border-left: 6px solid var(--accent); outline: none; }
  .manual-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; background: #1a1a1a; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
- .manual-fields input { background: #000; border: 1px solid #555; color: #fff; padding: 12px; border-radius: 4px; font-family: inherit; font-size: 0.9rem; width: 100%; }
+ .manual-fields input { background: #000; border: 1px solid #555; color: #fff; padding: 12px; border-radius: 4px; font-family: inherit; font-size: 16px; width: 100%; }
+ input, select, textarea { font-size: max(16px, 1em); }
+ html { -webkit-text-size-adjust: 100%; overflow-anchor: none; }
  .full-width { grid-column: span 2; }
  label { font-size: 0.7rem; color: var(--accent2); text-transform: uppercase; margin-bottom: 3px; display: block; font-weight: bold; }
  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
@@ -67,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.74 | Päivitetty: 30.10.2026</div>
+<div class="v-tag">V37.75 | Päivitetty: 30.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
