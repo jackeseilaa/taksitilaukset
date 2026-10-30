@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.76</title>
+ <title>Kuljetuskirja V37.77</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.76 | Päivitetty: 30.10.2026</div>
+<div class="v-tag">V37.77 | Päivitetty: 30.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -130,10 +130,17 @@
   <button type="button" class="btn-csv" id="btnVRRot" style="display:none;">↻ KÄÄNNÄ</button>
   <button type="button" class="btn-csv" id="btnVRSend" style="background:#2a4a2a;display:none;">TALLENNA RAPORTTI</button>
  </div>
- <input type="checkbox" id="vrEnh" checked style="display:none">
+ <input type="checkbox" id="vrEnh" style="display:none">
  <div style="font-size:0.75rem;color:#888;margin-top:6px;">Kuvaa suoraan ylhäältä, tarkenna napauttamalla.</div>
  <img id="vrPreview" alt="" style="display:none;max-width:100%;max-height:300px;margin-top:8px;border:1px solid #555;border-radius:4px;">
  <div id="vrInfo" style="margin-top:6px;font-size:0.85rem;color:#aaa;"></div>
+ <div id="vrForm" style="display:none;margin-top:8px;">
+  <div id="vrFormGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"></div>
+  <div style="display:flex;gap:8px;margin-top:10px;">
+   <button type="button" class="btn-csv" id="btnVRCommit" style="background:#2a4a2a;flex:2;">✔ TALLENNA RIVI SHEETIIN</button>
+   <button type="button" class="btn-csv" id="btnVRCancel" style="background:#4a3333;flex:1;">PERU</button>
+  </div>
+ </div>
 </div>
 <div class="modal-overlay" id="exportModal">
  <div class="modal-box">
@@ -358,6 +365,57 @@
  const top = vals.slice(0, Math.max(3, Math.round(vals.length * 0.5)));
  return top.reduce((s, v) => s + v, 0) / top.length;
  }
+ // Rajaa kuva kuittipaperiin (vaalea alue tummaa taustaa vasten); jos rajausta ei voi tehdä luotettavasti, palautetaan alkuperäinen
+ function vrCrop(c) {
+  try {
+   const sc = 200 / Math.max(c.width, c.height), w = Math.max(8, Math.round(c.width * sc)), h = Math.max(8, Math.round(c.height * sc));
+   const t = document.createElement('canvas'); t.width = w; t.height = h;
+   const tg = t.getContext('2d'); tg.drawImage(c, 0, 0, w, h);
+   const d = tg.getImageData(0, 0, w, h).data, n = w * h, lum = new Uint8Array(n), hist = new Array(256).fill(0);
+   for (let i = 0; i < n; i++) { const v = Math.round(0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]); lum[i] = v; hist[v]++; }
+   let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+   let wB = 0, sB = 0, best = 0, thr = 128;
+   for (let i = 0; i < 256; i++) { wB += hist[i]; if (!wB) continue; const wF = n - wB; if (!wF) break; sB += i * hist[i]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > best) { best = v; thr = i; } }
+   const rows = new Array(h).fill(0), cols = new Array(w).fill(0);
+   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (lum[y * w + x] > thr) { rows[y]++; cols[x]++; }
+   const rmax = Math.max.apply(null, rows), cmax = Math.max.apply(null, cols);
+   let y0 = 0, y1 = h - 1, x0 = 0, x1 = w - 1;
+   while (y0 < h && rows[y0] < rmax * 0.25) y0++; while (y1 > y0 && rows[y1] < rmax * 0.25) y1--;
+   while (x0 < w && cols[x0] < cmax * 0.25) x0++; while (x1 > x0 && cols[x1] < cmax * 0.25) x1--;
+   const area = (x1 - x0 + 1) * (y1 - y0 + 1) / n;
+   if (area < 0.12 || area > 0.9) return c;
+   const mx = Math.round(w * 0.02), my = Math.round(h * 0.02);
+   x0 = Math.max(0, x0 - mx); x1 = Math.min(w - 1, x1 + mx); y0 = Math.max(0, y0 - my); y1 = Math.min(h - 1, y1 + my);
+   const k = 1 / sc, sx = Math.round(x0 * k), sy = Math.round(y0 * k), sw2 = Math.min(c.width - sx, Math.round((x1 - x0 + 1) * k)), sh2 = Math.min(c.height - sy, Math.round((y1 - y0 + 1) * k));
+   const o = document.createElement('canvas'); o.width = sw2; o.height = sh2;
+   o.getContext('2d').drawImage(c, sx, sy, sw2, sh2, 0, 0, sw2, sh2);
+   return o;
+  } catch (e) { return c; }
+ }
+ const VR_LABELS = [['shift','Vuoro'],['date','Pvm (pp.kk.vvvv)'],['car','Auto'],['start','Alku'],['end','Loppu'],['odoStart','Mittari alussa'],['odoEnd','Mittari lopussa'],['km','Km yht.'],['kmProd','Tuottava km'],['kmUnprod','Tuottamaton km'],['rides','Ajot'],['driveT','Ajoaika'],['waitT','Odotus'],['holdT','Hold'],['otherT','Muu'],['totalT','Yhteensä aika'],['cash','Käteinen €'],['bills','Laskut €'],['cards','Kortit €'],['corp','Toimialakortit €'],['extras','Lisät €'],['pay','Maksu yht. €'],['gross','Brutto €'],['net','Netto €'],['vat','ALV €']];
+ let vrPending = null;
+ function vrShowForm(res) {
+  vrPending = { id: res.id, ocr: res.ocr || '' };
+  const f = res.fields || {};
+  document.getElementById('vrFormGrid').innerHTML = VR_LABELS.map(function (l) {
+   const v = f[l[0]] === undefined || f[l[0]] === null ? '' : String(f[l[0]]);
+   const empty = v === '';
+   return '<div><label>' + l[1] + '</label><input type="text" data-k="' + l[0] + '" value="' + escapeHtml(v) + '" style="font-size:16px;padding:8px;width:100%;background:#000;color:#fff;border:2px solid ' + (empty ? '#ffb74d' : '#555') + ';border-radius:4px;"></div>';
+  }).join('');
+  document.getElementById('vrForm').style.display = '';
+  document.getElementById('btnVRSend').style.display = 'none';
+  document.getElementById('btnVRRot').style.display = 'none';
+  const ok = res.check === 'OK' || /^OK/.test(res.check || '');
+  vrSetInfo((ok ? '✔ Luku näyttää täsmäävän. ' : '⚠ Tarkista oranssit ja virheelliset kentät kuittia vasten. ') + (res.check || '') + ' Mitään ei ole vielä tallennettu taulukkoon.', ok ? '#7ddf7d' : '#ffb74d');
+ }
+ function vrResetUi() {
+  vrPending = null; vrState = null;
+  document.getElementById('vrForm').style.display = 'none';
+  document.getElementById('vrPreview').style.display = 'none';
+  document.getElementById('btnVRRot').style.display = 'none';
+  document.getElementById('btnVRSend').style.display = 'none';
+  const fi2 = document.getElementById('inVR'); if (fi2) fi2.value = '';
+ }
  function vrShow() {
  const c = vrRender();
  const pv = document.getElementById('vrPreview'); pv.src = c.toDataURL("image/jpeg", 0.5); pv.style.display = '';
@@ -380,6 +438,22 @@
  else vrSetInfo("Tarkista, että teksti on suorassa (käytä ↻ KÄÄNNÄ) ja paina TALLENNA RAPORTTI." + (vrState.sharp !== null ? " Terävyys " + vrState.sharp.toFixed(2).replace(".", ",") + " ✔" : ""), '#aaa');
  } catch (e) { vrState = null; vrSetInfo("Kuvaa ei voitu avata: " + e.message, '#ff6666'); }
  };
+ document.getElementById('btnVRCancel').onclick = () => { vrResetUi(); vrSetInfo("Peruttu. Mitään ei tallennettu."); };
+ document.getElementById('btnVRCommit').onclick = async () => {
+  if (!vrPending) return;
+  const b = document.getElementById('btnVRCommit'); b.disabled = true;
+  try {
+   vrSetInfo("Tallennetaan taulukkoon…");
+   const fields = {}; document.querySelectorAll('#vrFormGrid input').forEach(i => { fields[i.dataset.k] = i.value.trim(); });
+   const res = await scriptCall({ action: "shiftReportCommit", id: vrPending.id, ocr: vrPending.ocr, fields: fields });
+   if (!res || !res.ok) throw new Error((res && res.error) || "ei yhteyttä");
+   const s = res.summary || {};
+   const ok = /^OK/.test(res.check || '');
+   vrResetUi();
+   vrSetInfo((ok ? "✔ Tallennettu. " : "⚠ Tallennettu, mutta tarkista taulukosta. ") + "Vuoro " + (s.shift || "?") + (s.date ? " (" + s.date + ")" : "") + ", auto " + (s.car || "?") + ". " + (res.check || "") + (res.replaced ? " (päivitti aiemman rivin)" : ""), ok ? '#7ddf7d' : '#ffb74d');
+  } catch (e) { vrSetInfo("Tallennus epäonnistui: " + e.message + ". Tiedot ovat vielä lomakkeella, yritä uudelleen.", '#ff6666'); }
+  b.disabled = false;
+ };
  document.getElementById('btnVRRot').onclick = () => { if (vrState) { vrState.rot = (vrState.rot + 90) % 360; vrShow(); } };
  document.getElementById('btnVRSend').onclick = async () => {
  if (!vrState) return;
@@ -392,11 +466,13 @@
  try {
  vrSetInfo("Parannetaan kuvaa, lähetetään ja luetaan raporttia… (voi kestää 30 s)");
  await new Promise(r => setTimeout(r, 30));
- const c = vrRender();
+ let c = vrRender();
+ c = vrCrop(c);
  if (document.getElementById('vrEnh').checked) vrEnhance(c);
- const b64 = c.toDataURL("image/jpeg", 0.85).split(",")[1];
- const res = await scriptCall({ action: "shiftReport", name: "vuororaportti.jpg", b64: b64 });
+ const b64 = c.toDataURL("image/jpeg", 0.92).split(",")[1];
+ const res = await scriptCall({ action: "shiftReport", name: "vuororaportti.jpg", b64: b64, preview: true });
  if (!res || !res.ok) throw new Error((res && res.error) || "ei yhteyttä");
+ if (res.preview) { vrShowForm(res); btn.disabled = false; return; }
  const s = res.summary || {};
  const head = "Vuoro " + (s.shift || "?") + (s.date ? " (" + s.date + ")" : "") + ", auto " + (s.car || "?") + ": " + (s.km !== "" && s.km !== undefined ? s.km + " km" : "? km") + ", " + (s.rides !== "" && s.rides !== undefined ? s.rides : "?") + " ajoa, brutto " + (s.gross !== "" && s.gross !== undefined ? s.gross + " €" : "?");
  const ok = res.check === "OK";
