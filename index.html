@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.75</title>
+ <title>Kuljetuskirja V37.76</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.75 | Päivitetty: 30.10.2026</div>
+<div class="v-tag">V37.76 | Päivitetty: 30.10.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1037,7 +1037,7 @@
  if (autoMatch) {
  car = autoMatch[1].trim();
  } else {
- const codeMatch = msg.match(/\b(?!\d{3,4}\b)([A-Z0-9]{3,4})\b/);
+ const codeMatch = msg.match(/\b(?!\d{3,4}\b)(?!VIP\b)([A-Z0-9]{3,4})\b/);
  if (codeMatch) car = codeMatch[1];
  }
  let tyyppi = '';
