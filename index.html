@@ -6,7 +6,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <title>Kuljetuskirja V37.77</title>
+ <title>Kuljetuskirja V37.78</title>
  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@800&display=swap" rel="stylesheet">
  <style>
  :root { 
@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.77 | Päivitetty: 30.10.2026</div>
+<div class="v-tag">V37.78 | Päivitetty: 2.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -78,7 +78,7 @@
  <div><label>Klo</label><input type="text" id="inKlo" placeholder="hh:mm"></div>
  <div><label>Auto *</label><input type="text" id="inAuto" placeholder="123 tai SMB"></div>
  <div><label>Hinta (€)</label><input type="text" id="inHinta" style="background:#ffff00; color:#000; font-weight:bold;" placeholder="0.00"></div>
- <div><label>Tyyppi</label><input type="text" id="inTyyppi"></div>
+ <div><label>Tyyppi</label><select id="inTyyppi"><option value="">Normaali</option><option value="Vip">VIP</option><option value="Tavara">Tavarakuljetus (alv 25,5 %)</option></select></div>
  <div class="full-width"><label>Lähtö</label><input type="text" id="inFrom"></div>
  <div class="full-width"><label>Meno</label><input type="text" id="inTo"></div>
  <div><label>Matkustaja</label><input type="text" id="inNimi"></div>
@@ -860,7 +860,7 @@
  document.getElementById('inKlo').value = r.time || '';
  document.getElementById('inAuto').value = r.car || '';
  document.getElementById('inHinta').value = r.price || '';
- document.getElementById('inTyyppi').value = r.type || '';
+ document.getElementById('inTyyppi').value = /tavara/i.test(r.type || '') ? 'Tavara' : (/vip/i.test(r.type || '') ? 'Vip' : '');
  document.getElementById('inFrom').value = r.from || '';
  document.getElementById('inTo').value = r.to || '';
  document.getElementById('inNimi').value = r.customer || '';
@@ -1118,6 +1118,7 @@
  }
  let tyyppi = '';
  if (/(?:^|[^a-zäöå0-9])vip(?![a-zäöå0-9])/i.test(msg)) tyyppi = 'Vip';
+ if (/tavara/i.test(msg)) tyyppi = 'Tavara';
  if (date) document.getElementById('inPvm').value = date;
  if (time) document.getElementById('inKlo').value = time;
  if (price) document.getElementById('inHinta').value = price;
@@ -1483,7 +1484,7 @@
  };
  /* ===== /Laskutettavat kyydit ===== */
  /* ===== Laskuliite: ajovuorot (Taksipalvelu Simonen) ===== */
- const SHIFT_ALV_KASSA = 13.5, SHIFT_OSUUS = 55, SHIFT_ALV_LASKU = 25.5;
+ const SHIFT_ALV_TAVARA = 25.5, SHIFT_ALV_KASSA = 13.5, SHIFT_OSUUS = 55, SHIFT_ALV_LASKU = 25.5;
  const shiftR2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
  const shiftWd = ['Su', 'Ma', 'Ti', 'Ke', 'To', 'Pe', 'La'];
  const shiftIsoToDate = (s) => { const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
@@ -1494,9 +1495,10 @@
  window.buildShiftSummary = (rows) => {
  const lines = rows.map(r => {
  const kor = r.korjaus || 0, eff = r.brutto + kor;
- const a0 = shiftR2(eff / (1 + SHIFT_ALV_KASSA / 100));
- const p = shiftR2(eff / (1 + SHIFT_ALV_KASSA / 100) * (SHIFT_OSUUS / 100));
- return { date: r.date, car: r.car, brutto: r.brutto, korjaus: kor, alv0: a0, palkkio: p };
+ const tav = r.tavara || 0;
+ const a0 = shiftR2((eff - tav) / (1 + SHIFT_ALV_KASSA / 100) + tav / (1 + SHIFT_ALV_TAVARA / 100));
+ const p = shiftR2(((eff - tav) / (1 + SHIFT_ALV_KASSA / 100) + tav / (1 + SHIFT_ALV_TAVARA / 100)) * (SHIFT_OSUUS / 100));
+ return { date: r.date, car: r.car, brutto: r.brutto, korjaus: kor, tavara: tav, alv0: a0, palkkio: p };
  });
  const sum = (k) => shiftR2(lines.reduce((a, l) => a + l[k], 0));
  const palkkio = sum('palkkio');
@@ -1525,7 +1527,7 @@
  const resp = await fetch(SHEET_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'shifts', idToken: idToken, from: shiftIso(f), to: shiftIso(t) }) });
  const jr = await resp.json();
  if (!jr || !jr.ok || !Array.isArray(jr.shifts)) { shiftMsg('Sheets ei palauttanut vuoroja' + (jr && jr.error ? ': ' + jr.error : '') + '.'); return; }
- shiftRows = jr.shifts.map(s => ({ date: s.date, car: String(s.car || ''), brutto: Number(s.brutto) || 0, korjaus: Number(s.korjaus) || 0, start: s.start || '', end: s.end || '', billed: s.billed || '', on: (Number(s.brutto) || 0) > 0 && !s.billed }));
+ shiftRows = jr.shifts.map(s => ({ date: s.date, car: String(s.car || ''), brutto: Number(s.brutto) || 0, korjaus: Number(s.korjaus) || 0, tavara: Number(s.tavara) || 0, start: s.start || '', end: s.end || '', billed: s.billed || '', on: (Number(s.brutto) || 0) > 0 && !s.billed }));
  if (shiftRows.length === 0) shiftMsg('Ei ajovuoroja valitulla aikavälillä.');
  renderShiftList();
  } catch (e) { console.error(e); shiftMsg('Haku epäonnistui: ' + e.message); }
@@ -1591,8 +1593,9 @@
  [new Date(Date.UTC(dd.getFullYear(), dd.getMonth(), dd.getDate())), shiftWd[dd.getDay()], /^\d+$/.test(l.car) ? Number(l.car) : l.car, l.brutto, l.korjaus, shiftR2(l.brutto + l.korjaus), l.alv0, l.palkkio].forEach((v, i) => {
  const c = row.getCell(i + 1); c.value = v;
  if (i === 5) c.value = { formula: 'D' + row.number + '+E' + row.number, result: shiftR2(l.brutto + l.korjaus) };
- if (i === 6) c.value = { formula: 'ROUND(F' + row.number + '/' + (1 + SHIFT_ALV_KASSA / 100) + ',2)', result: l.alv0 };
- if (i === 7) c.value = { formula: 'ROUND(F' + row.number + '/' + (1 + SHIFT_ALV_KASSA / 100) + '*' + (SHIFT_OSUUS / 100) + ',2)', result: l.palkkio };
+ const fx = 'ROUND((F' + row.number + '-' + (l.tavara || 0) + ')/' + (1 + SHIFT_ALV_KASSA / 100) + '+' + (l.tavara || 0) + '/' + (1 + SHIFT_ALV_TAVARA / 100) + ',2)';
+ if (i === 6) c.value = { formula: fx, result: l.alv0 };
+ if (i === 7) c.value = { formula: 'ROUND(((F' + row.number + '-' + (l.tavara || 0) + ')/' + (1 + SHIFT_ALV_KASSA / 100) + '+' + (l.tavara || 0) + '/' + (1 + SHIFT_ALV_TAVARA / 100) + ')*' + (SHIFT_OSUUS / 100) + ',2)', result: l.palkkio };
  c.border = { bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } } };
  if (i === 0) c.numFmt = 'd.m.yyyy';
  if (i >= 3) c.numFmt = eur;
@@ -1612,7 +1615,7 @@
  const c = row.getCell(8); c.value = v; c.numFmt = eur; c.font = { bold: true };
  });
  r++;
- ws.getCell('A' + r).value = 'Korjattu brutto = bruttokassa + korjaus. Palkkio = korjattu brutto ÷ ' + (1 + SHIFT_ALV_KASSA / 100).toFixed(3).replace('.', ',') + ' × ' + SHIFT_OSUUS + ' %. Kassa on päivän kassasumma, johon sisältyy alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' %.';
+ ws.getCell('A' + r).value = 'Korjattu brutto = bruttokassa + korjaus. Palkkio = korjattu brutto ÷ ' + (1 + SHIFT_ALV_KASSA / 100).toFixed(3).replace('.', ',') + ' × ' + SHIFT_OSUUS + ' %. Kassa on päivän kassasumma, johon sisältyy alv ' + String(SHIFT_ALV_KASSA).replace('.', ',') + ' % (tavarakuljetukset alv ' + String(SHIFT_ALV_TAVARA).replace('.', ',') + ' %).';
  ws.getCell('A' + r).font = { italic: true, color: { argb: 'FF555555' } };
  [11, 5, 7, 22, 12, 16, 14, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
  ws.pageSetup = { orientation: 'landscape', fitToPage: true };
