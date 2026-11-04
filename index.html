@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.79 | Päivitetty: 4.11.2026</div>
+<div class="v-tag">V37.80 | Päivitetty: 4.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1003,7 +1003,7 @@
  let fromLines = [];
  for (let j = i + 1; j < lines.length && j < i + 3; j++) {
  const line = lines[j].trim();
- if (!line || line.match(/^(meno|to|mihin|kohde|määränpää|tilaaja|nimi|kyytiin|hinta|lasku|huomio|ok)/i)) break;
+ if (!line || line.match(/^(meno|to|mihin|kohde|määränpää|tilaaja|nimi|kyytiin|hinta|lasku|huomio|ok|väli)/i)) break;
  if (line) fromLines.push(line);
  }
  from = fromLines.join(' ').trim();
@@ -1121,6 +1121,23 @@
  break;
  }
  }
+ // Välipysähdys(-paikat) ja "Km ja aika ylös" -ohje Huomioon
+ const extraNotes = [];
+ for (let i = 0; i < lines.length; i++) {
+ const vm = lines[i].trim().match(/^[\s\/]*(väli\s*pysähdys|välipysähdys|välipysäkki|väli\s*pysäkki|pysähdys)\s*(?:paikka)?[:\s]*(.*)$/i);
+ if (vm) {
+ const vl = [];
+ if (vm[2] && vm[2].trim()) vl.push(vm[2].trim());
+ for (let j = i + 1; j < lines.length && j < i + 3; j++) {
+ const l = lines[j].trim();
+ if (!l || l.match(/^(lähtö|meno|mihin|mistä|nimi|kyytiin|hinta|tilaaja|lasku|huomio|ok|km)/i)) break;
+ vl.push(l);
+ }
+ if (vl.length) extraNotes.push('Välipysähdys: ' + vl.join(' '));
+ }
+ if (/^[\s\/]*km\s+(ja|&)\s+aika/i.test(lines[i].trim())) extraNotes.push('Km ja aika ylös');
+ }
+ if (extraNotes.length) notes = (extraNotes.join(' · ') + (notes ? ' · ' + notes : '')).trim();
  let car = '';
  const autoMatch = msg.match(/\b(?:auto|nro|ajoneuvo)\b[:\s]+(\w+)/i);
  if (autoMatch) {
