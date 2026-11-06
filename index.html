@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.80 | Päivitetty: 4.11.2026</div>
+<div class="v-tag">V37.81 | Päivitetty: 6.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -206,8 +206,11 @@
  <div class="modal-field"><label>Alkupäivä</label><input type="date" id="shiftFrom"></div>
  <div class="modal-field"><label>Loppupäivä</label><input type="date" id="shiftTo"></div>
  <div class="modal-buttons" style="margin-top:0;"><button class="modal-btn ok" onclick="loadShifts()">HAE VUOROT</button></div>
+ <div class="modal-field" style="margin-top:8px;"><label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="shiftShowBilled" style="width:auto;"> Näytä myös jo laskutetut vuorot</label></div>
  <div class="modal-field" id="shiftList" style="margin-top:12px;"></div>
  <div class="modal-field" id="shiftSummary" style="display:none; border-top:1px solid #555; padding-top:8px;"></div>
+ <div class="modal-field"><label>Laskutettu-merkintä (esim. Vko 44 tai laskun numero)</label><input type="text" id="shiftTag" placeholder="Vko 44" oninput="this.dataset.touched='1'"></div>
+ <div class="modal-field"><label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="shiftMarkOn" checked style="width:auto;"> Merkitse valitut vuorot laskutetuiksi, kun Excel on ladattu</label></div>
  <div class="modal-field" id="shiftMsg" style="display:none; color:#ff8080;"></div>
  <div class="modal-buttons">
  <button class="modal-btn ok" id="shiftDl" onclick="downloadShiftXlsx()" disabled>LATAA EXCEL</button>
@@ -1537,15 +1540,35 @@
  };
  window.openShiftModal = () => {
  const today = new Date();
- const mon = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7) - 7);
- document.getElementById('shiftFrom').value = shiftIso(mon);
+ document.getElementById('shiftFrom').value = shiftIso(new Date(today.getFullYear(), 0, 1));
  document.getElementById('shiftTo').value = shiftIso(today);
+ document.getElementById('shiftShowBilled').checked = false;
+ const tg = document.getElementById('shiftTag'); tg.value = ''; tg.dataset.touched = '';
  shiftRows = [];
  renderShiftList();
  document.getElementById('shiftModal').classList.add('active');
+ loadShifts();
+ };
+ const shiftIsoWeek = (d) => { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const dn = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - dn); const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - y0) / 86400000 + 1) / 7); };
+ document.getElementById('shiftShowBilled').addEventListener('change', () => renderShiftList());
+ window.markShiftsBilled = async (sel) => {
+ const tag = document.getElementById('shiftTag').value.trim();
+ if (!document.getElementById('shiftMarkOn').checked) return;
+ if (!tag) { shiftMsg('Excel ladattu, mutta vuoroja ei merkitty laskutetuiksi: kirjoita Laskutettu-merkintä.'); return; }
+ const items = sel.filter(r => !r.billed).map(r => ({ date: r.date, car: r.car }));
+ if (!items.length) return;
+ try {
+ const idToken = await auth.currentUser.getIdToken();
+ const resp = await fetch(SHEET_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'shiftMark', idToken: idToken, items: items, tag: tag }) });
+ const jr = await resp.json();
+ if (!jr || !jr.ok) { shiftMsg('Excel ladattu, mutta merkintä Sheetiin epäonnistui' + (jr && jr.error ? ': ' + jr.error : '') + '.'); return; }
+ sel.forEach(r => { if (!r.billed) r.billed = tag; r.on = false; });
+ renderShiftList();
+ shiftMsg('Valmis: ' + (jr.marked ? jr.marked.marked : items.length) + ' ajovuoroa merkitty laskutetuiksi (' + tag + ').', true);
+ } catch (e) { console.error(e); shiftMsg('Excel ladattu, mutta merkintä Sheetiin epäonnistui: ' + e.message); }
  };
  window.closeShiftModal = () => document.getElementById('shiftModal').classList.remove('active');
- const shiftMsg = (t) => { const el = document.getElementById('shiftMsg'); el.textContent = t || ''; el.style.display = t ? 'block' : 'none'; };
+ const shiftMsg = (t, ok) => { const el = document.getElementById('shiftMsg'); el.textContent = t || ''; el.style.color = ok ? '#7fd67f' : '#ff8080'; el.style.display = t ? 'block' : 'none'; };
  const dateInputVal = (id) => { const v = document.getElementById(id).value.trim(); const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : parseFinnishDate(v); };
  window.loadShifts = async () => {
  shiftMsg('');
@@ -1559,13 +1582,16 @@
  if (!jr || !jr.ok || !Array.isArray(jr.shifts)) { shiftMsg('Sheets ei palauttanut vuoroja' + (jr && jr.error ? ': ' + jr.error : '') + '.'); return; }
  shiftRows = jr.shifts.map(s => ({ date: s.date, car: String(s.car || ''), brutto: Number(s.brutto) || 0, korjaus: Number(s.korjaus) || 0, tavara: Number(s.tavara) || 0, start: s.start || '', end: s.end || '', billed: s.billed || '', on: (Number(s.brutto) || 0) > 0 && !s.billed }));
  if (shiftRows.length === 0) shiftMsg('Ei ajovuoroja valitulla aikavälillä.');
+ else if (!shiftRows.some(r => !r.billed)) shiftMsg('Kaikki valitun välin ajovuorot on jo laskutettu. Rastita "Näytä myös jo laskutetut" nähdäksesi ne.', true);
  renderShiftList();
  } catch (e) { console.error(e); shiftMsg('Haku epäonnistui: ' + e.message); }
  };
  const renderShiftList = () => {
  const box = document.getElementById('shiftList');
  box.textContent = '';
+ const showBilled = document.getElementById('shiftShowBilled').checked;
  shiftRows.forEach((r, i) => {
+ if (r.billed && !showBilled) return;
  const d = shiftIsoToDate(r.date);
  const lab = document.createElement('label');
  lab.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px;';
@@ -1585,6 +1611,8 @@
  const sel = shiftRows.filter(r => r.on);
  const box = document.getElementById('shiftSummary');
  document.getElementById('shiftDl').disabled = sel.length === 0;
+ const tg = document.getElementById('shiftTag');
+ if (tg && !tg.dataset.touched) { const f = sel.find(r => !r.billed); tg.value = f ? 'Vko ' + shiftIsoWeek(shiftIsoToDate(f.date)) : ''; }
  if (sel.length === 0) { box.style.display = 'none'; return; }
  const s = buildShiftSummary(sel);
  box.style.display = 'block';
@@ -1604,6 +1632,7 @@
  csv += ';;Yhteensä;' + s.brutto.toFixed(2).replace('.', ',') + ';' + s.korjaus.toFixed(2).replace('.', ',') + ';' + (s.brutto + s.korjaus).toFixed(2).replace('.', ',') + ';' + s.alv0.toFixed(2).replace('.', ',') + ';' + s.palkkio.toFixed(2).replace('.', ',') + '\n';
  csv += ';;Alv ' + SHIFT_ALV_LASKU + ' %;;;;;' + s.alv.toFixed(2).replace('.', ',') + '\n;;Laskun summa;;;;;' + s.total.toFixed(2).replace('.', ',') + '\n';
  saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), fname + '.csv');
+ markShiftsBilled(sel);
  };
  const makeXlsx = async () => {
  const wb = new ExcelJS.Workbook();
@@ -1651,6 +1680,7 @@
  ws.pageSetup = { orientation: 'landscape', fitToPage: true };
  const buf = await wb.xlsx.writeBuffer();
  saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fname + '.xlsx');
+ await markShiftsBilled(sel);
  };
  if (window.ExcelJS) { makeXlsx().catch(e => { console.error(e); csvFallback(); }); return; }
  const sc = document.createElement('script');
