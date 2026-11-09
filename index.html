@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.84 | Päivitetty: 9.11.2026</div>
+<div class="v-tag">V37.85 | Päivitetty: 9.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -423,7 +423,7 @@
   document.getElementById('btnVRSend').style.display = 'none';
   document.getElementById('btnVRRot').style.display = 'none';
   const ok = res.check === 'OK' || /^OK/.test(res.check || '');
-  vrSetInfo((ok ? '✔ Luku näyttää täsmäävän. ' : '⚠ Tarkista oranssit ja virheelliset kentät kuittia vasten. ') + (res.check || '') + ' Mitään ei ole vielä tallennettu taulukkoon.', ok ? '#7ddf7d' : '#ffb74d');
+  vrSetInfo((ok ? '✔ Luku näyttää täsmäävän. ' : '⚠ Epäselvät kentät (oranssi) voi jättää tyhjiksi: rivi tallentuu silti ja voit täydentää ne myöhemmin kuvagalleriasta. ') + (res.check || '') + ' Rivi ei ole vielä taulukossa: paina TALLENNA.', ok ? '#7ddf7d' : '#ffb74d');
  }
  function vrResetUi() {
   vrPending = null; vrState = null;
@@ -474,11 +474,6 @@
  document.getElementById('btnVRRot').onclick = () => { if (vrState) { vrState.rot = (vrState.rot + 90) % 360; vrShow(); } };
  document.getElementById('btnVRSend').onclick = async () => {
  if (!vrState) return;
- if (vrState.sharp !== null && vrState.sharp !== undefined && vrState.sharp < VR_SHARP_MIN && !vrState.sendAnyway) {
- vrState.sendAnyway = true;
- vrSetInfo("⚠ Kuva on epätarkka (terävyys " + vrState.sharp.toFixed(2).replace(".", ",") + "), jolloin luvut luetaan todennäköisesti väärin. Ota mieluummin uusi kuva. Jos haluat silti lähettää tämän, paina TALLENNA RAPORTTI vielä kerran.", '#ffb74d');
- return;
- }
  const btn = document.getElementById('btnVRSend'); btn.disabled = true;
  try {
  vrSetInfo("Parannetaan kuvaa, lähetetään ja luetaan raporttia… (voi kestää 30 s)");
