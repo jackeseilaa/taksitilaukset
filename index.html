@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.82 | Päivitetty: 7.11.2026</div>
+<div class="v-tag">V37.83 | Päivitetty: 9.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -747,6 +747,7 @@
  <td>
  ${receiptCell(r)}
  <button class="action-btn" onclick="window.prepareEdit('${r.id}')">✎</button>
+ <button class="action-btn" title="Kopioi uudeksi kyydiksi" onclick="window.copyEntry('${r.id}')">⎘</button>
  <button class="action-btn" title="${r.voided ? 'Palauta voimaan' : 'Mitätöi'}" onclick="window.voidEntry('${r.id}')">${r.voided ? '↺' : '⊘'}</button>
  <button class="action-btn del-btn" onclick="window.deleteEntry('${r.id}')">X</button>
  </td>`;
@@ -892,6 +893,29 @@
  document.getElementById('btnSave').innerText = "PÄIVITÄ TILAUS";
  showExistingReceipt(r);
  window.scrollTo(0,0);
+ };
+ window.copyEntry = (id) => {
+ const r = currentLogs.find(l => l.id === id);
+ if (!r) { showError("Tilausta ei löydy"); return; }
+ if (editId) cancelEdit();
+ clearForm();
+ const t = new Date();
+ document.getElementById('inPvm').value = String(t.getDate()).padStart(2, '0') + '.' + String(t.getMonth() + 1).padStart(2, '0') + '.' + t.getFullYear();
+ document.getElementById('inKlo').value = '';
+ document.getElementById('inAuto').value = r.car || '';
+ document.getElementById('inHinta').value = r.price || '';
+ document.getElementById('inTyyppi').value = /tavara/i.test(r.type || '') ? 'Tavara' : (/vip/i.test(r.type || '') ? 'Vip' : '');
+ document.getElementById('inFrom').value = r.from || '';
+ document.getElementById('inTo').value = r.to || '';
+ document.getElementById('inNimi').value = r.customer || '';
+ document.getElementById('inPuhelin').value = r.phone || '';
+ document.getElementById('inTilaaja').value = r.orderer || '';
+ document.getElementById('inLasku').value = r.billing || '';
+ document.getElementById('inHuomio').value = r.notes || '';
+ document.getElementById('inPoikkeama').value = '';
+ document.getElementById('inKorjaus').checked = false;
+ window.scrollTo(0, 0);
+ const kl = document.getElementById('inKlo'); kl.focus();
  };
  window.deleteEntry = async (id) => { 
  if(confirm("Poista tilaus?")) {
