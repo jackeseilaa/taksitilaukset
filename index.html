@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.93 | Päivitetty: 9.11.2026</div>
+<div class="v-tag">V37.94 | Päivitetty: 9.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1718,7 +1718,7 @@
  /* ===== /Laskuliite ===== */
  /* ===== Päivän tilauslista (tulostettava) ===== */
 
- const PDF_SNIPPET = `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script><script>function pdfShare(fmt,name){var bar=document.querySelector('.bar');if(typeof html2pdf==='undefined'){alert('PDF-kirjasto ei latautunut. Tarkista verkkoyhteys.');return;}bar.style.display='none';html2pdf().set({margin:5,filename:name,image:{type:'jpeg',quality:0.95},html2canvas:{scale:2},pagebreak:{mode:['css'],after:'.page:not(:last-child)'},jsPDF:{unit:'mm',format:fmt,orientation:'landscape'}}).from(document.body).outputPdf('blob').then(function(b){bar.style.display='';var f=new File([b],name,{type:'application/pdf'});if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:name}).catch(function(){});}else{location.href=URL.createObjectURL(b);}}).catch(function(e){bar.style.display='';alert('PDF:n luonti epäonnistui: '+e);});}<\/script>`;
+ const PDF_SNIPPET = `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script><script>function pdfShare(fmt,name){var bar=document.querySelector('.bar');if(typeof html2pdf==='undefined'){alert('PDF-kirjasto ei latautunut. Tarkista verkkoyhteys.');return;}bar.style.display='none';var opt={margin:5,filename:name,image:{type:'jpeg',quality:0.95},html2canvas:{scale:2},jsPDF:{unit:'mm',format:fmt,orientation:'landscape'}};var pages=document.querySelectorAll('.page');var wk;if(pages.length>1){wk=html2pdf().set(opt).from(pages[0]).toPdf();for(var i=1;i<pages.length;i++){(function(pg){wk=wk.get('pdf').then(function(pdf){pdf.addPage();}).from(pg).toContainer().toCanvas().toPdf();})(pages[i]);}}else{wk=html2pdf().set(opt).from(pages.length?pages[0]:document.body).toPdf();}wk.output('blob').then(function(b){bar.style.display='';var f=new File([b],name,{type:'application/pdf'});if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:name}).catch(function(){});}else{location.href=URL.createObjectURL(b);}}).catch(function(e){bar.style.display='';alert('PDF:n luonti epäonnistui: '+e);});}<\/script>`;
  window.openPrintModal = () => {
  document.getElementById('printDate').value = shiftIso(new Date());
  document.getElementById('printMsg').style.display = 'none';
