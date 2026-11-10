@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V37.91 | Päivitetty: 9.11.2026</div>
+<div class="v-tag">V37.92 | Päivitetty: 9.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1767,7 +1767,7 @@
  msg.style.display = 'none';
  const e = escapeHtml;
  const carNo = car ? document.getElementById('printCar').value.trim() : (rows[0].car || '');
- const mkLines = (rs) => rs.map(r => '<tr><td class="l">' + e(r.time || '') + (r.price ? '<br>' + e(String(r.price).replace('.', ',')) + ' €' : '') + '</td><td>' + e((r.from || '-') + ' → ' + (r.to || '-')) + '<br><span class="s">' + e([r.customer, r.phone, r.orderer ? 'tilaaja ' + r.orderer : '', r.billing ? 'lasku: ' + r.billing : '', r.type && /tavara/i.test(r.type) ? 'Tavarakuljetus' : '', r.notes].filter(Boolean).join(' · ')) + '</span></td></tr>').join('');
+ const mkLines = (rs) => rs.map(r => '<tr><td class="l">' + e(r.time || '') + (r.price ? '<br>' + e(String(r.price).replace('.', ',')) + ' €' : '') + '</td><td>' + e((r.from || '-') + ' → ' + (r.to || '-')) + '<br><span class="s">' + e([r.customer, r.phone, r.orderer ? 'tilaaja ' + r.orderer : '', r.billing ? 'lasku: ' + r.billing : '', r.type && /tavara/i.test(r.type) ? 'Tavarakuljetus' : ''].filter(Boolean).join(' · ')) + '</span></td></tr>').join('');
  const fs = (!perRide && rows.length > 7) ? 8 : 10;
  const mkPage = (rs) => '<div class="page"><div class="h"><span>TAKSIPALVELU SIMONEN OY</span><span>AJOPÄIVÄKIRJA</span></div><div class="g"><div><small>Auto nro. (taksikupu)</small>' + e(perRide ? (rs[0].car || carNo) : carNo) + '</div><div><small>Auto rek.nro.</small></div><div><small>Kuljettajan ID</small>25224</div><div><small>Kuljettajan sukunimi + etunimi</small>Aaltonen Jarmo</div><div><small>Aloitus pvm</small>' + e(dayKey) + '</div><div><small>Klo</small>' + (perRide ? e(rs[0].time || '') : '') + '</div><div><small>Lopetus pvm</small>' + e(dayKey) + '</div><div><small>Klo</small></div></div><div class="main"><div><table><thead><tr><th>Klo / hinta</th><th>Laskutustiedot: klo-klo, mistä mihin (osoitteet), muuta huomioitavaa, asiakastiedot</th></tr></thead><tbody>' + mkLines(rs) + '</tbody></table></div><div class="r"><div><small>Matkamittari alussa</small></div><div><small>Matkamittari lopussa</small></div><div><small>Ajettu</small></div><div><small>Kassa</small></div><div><small>Käteis</small></div><div><small>EMV</small></div><div><small>T-kortti</small></div><div><small>O-lasku</small></div></div></div><div class="sign">Kuljettajan allekirjoitus</div></div>';
  const pagesHtml = perRide ? rows.map(r => mkPage([r])).join('') : mkPage(rows);
