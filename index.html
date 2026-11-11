@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.14 | Päivitetty: 9.11.2026</div>
+<div class="v-tag">V38.15 | Päivitetty: 9.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1780,11 +1780,12 @@
  const idToken = await auth.currentUser.getIdToken();
  const resp = await fetch(SHEET_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'shifts', idToken: idToken, from: iso, to: iso }) });
  const jr = await resp.json();
- if (jr && jr.ok && Array.isArray(jr.shifts)) jr.shifts.forEach(x => { const ck = String(x.car || '').trim().toLowerCase(); if (Number(x.brutto)) shiftBrutto[ck] = Number(x.brutto); shiftKm[ck] = { s: x.kmStart || '', e: x.kmEnd || '', k: x.kmDriven || '' }; });
+ if (jr && jr.ok && Array.isArray(jr.shifts)) jr.shifts.forEach(x => { const ck = String(x.car || '').trim().toLowerCase(); if (Number(x.brutto)) shiftBrutto[ck] = Number(x.brutto); shiftKm[ck] = { s: x.kmStart || '', e: x.kmEnd || '', k: x.kmDriven || '', st: x.start || '', en: x.end || '' }; });
  } catch (x) { console.error(x); }
  }
  const kassaOf = (rs) => { const c = String(rs[0].car || '').trim().toLowerCase(); if (/^\d+$/.test(c)) return shiftBrutto[c] || 0; return rs.reduce((a, r) => a + num(r.price), 0); };
  const isNumCar = (rs) => /^\d+$/.test(String(rs[0].car || '').trim());
+ const shiftT = (rs, k) => { const t = String((shiftKm[String(rs[0].car || '').trim().toLowerCase()] || {})[k] || '').trim(); const m = t.match(/^(\d{1,2}):(\d{2})/); return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : ''; };
  const fld = (lab, val, cls) => '<div class="c ' + (cls || '') + '"><small>' + lab + '</small>' + (val ? '<b>' + e(val) + '</b>' : '') + '</div>';
  const num = (v) => { const n = parseFloat(String(v || '').replace(',', '.')); return isNaN(n) ? 0 : n; };
  const fmtE = (n) => n ? n.toFixed(2).replace('.', ',') : '';
@@ -1803,7 +1804,7 @@
  const chk = ['Rekisteriote', 'Liikennelupa', 'Diesel-kortti', 'Autopuhelin', 'Laturi', 'LK-tägi', 'HTD-puhelin'].map(x => '<span><i></i>' + x + '</span>').join('');
  return '<div class="page"><div class="rot"><div class="note">Tilitykset tuotava vähintään kerran viikossa.</div><div class="h"><span>TAKSIPALVELU SIMONEN OY</span><span class="t">AJOPÄIVÄKIRJA</span></div>'
  + '<div class="g4">' + fld('Auto nro. (taksikupu)', car0) + fld('Auto rek.nro.:', '') + fld('Kuljettajan ID:', '25224') + fld('Kuljettajan sukunimi + etunimi', 'Aaltonen Jarmo') + '</div>'
- + '<div class="two"><div class="lc"><div class="g3b">' + fld('Aloitus pvm:', dayKey) + fld('Klo:', perRide ? (rsAll[0].time || '') : '') + '<div class="c tauot"><small>Tauot:</small></div>' + fld('Lopetus pvm:', dayKey) + fld('Klo:', '') + '</div>'
+ + '<div class="two"><div class="lc"><div class="g3b">' + fld('Aloitus pvm:', dayKey) + fld('Klo:', isNumCar(rsAll) ? shiftT(rsAll, 'st') : (perRide ? (rsAll[0].time || '') : '')) + '<div class="c tauot"><small>Tauot:</small></div>' + fld('Lopetus pvm:', dayKey) + fld('Klo:', isNumCar(rsAll) ? shiftT(rsAll, 'en') : '') + '</div>'
  + '<div class="chk"><small>Lähtiessä autossa oli</small>' + chk + '</div>'
  + '<table><thead><tr><th class="l">Poikkeavat ajot:</th><th>Laskutustiedot: klo-klo, mistä mihin (osoitteet), muuta huomioitavaa, asiakastiedot:</th></tr></thead><tbody>' + trs + '</tbody></table>'
  + '<div class="ln"><small>Huomautettavaa toimistolle:</small></div><div class="ln"><small>Auton kunto ennen vuoroa:</small></div><div class="ln"><small>Auton kunto vuoron jälkeen:</small></div></div>'
