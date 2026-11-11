@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.15 | Päivitetty: 9.11.2026</div>
+<div class="v-tag">V38.16 | Päivitetty: 11.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -198,6 +198,7 @@
  <button class="modal-btn ok" onclick="printDayList()">AVAA TULOSTETTAVA LISTA</button>
  <button class="modal-btn ok" onclick="printLogbook()">AJOPÄIVÄKIRJA (TULOSTETTAVA)</button>
  <button class="modal-btn ok" onclick="printLogbook(true)">AJOPÄIVÄKIRJA: OMA LEHTI JOKAISELLE AJOLLE</button>
+ <button class="modal-btn ok" onclick="saveLogbooksFromModal()">💾 TALLENNA AJOPÄIVÄKIRJA DRIVEEN (PDF)</button>
  <button class="modal-btn cancel" onclick="closePrintModal()">SULJE</button>
  </div>
  </div>
@@ -469,7 +470,16 @@
    const s = res.summary || {};
    const ok = /^OK/.test(res.check || '');
    vrResetUi();
-   vrSetInfo((ok ? "✔ Tallennettu. " : "⚠ Tallennettu, mutta tarkista taulukosta. ") + "Vuoro " + (s.shift || "?") + (s.date ? " (" + s.date + ")" : "") + ", auto " + (s.car || "?") + ". " + (res.check || "") + (res.replaced ? " (päivitti aiemman rivin)" : ""), ok ? '#7ddf7d' : '#ffb74d');
+   let pdfNote = "";
+   try {
+    const dm = String(s.date || "").match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (dm && s.car) {
+     vrSetInfo("Tallennettu. Tehdään ajopäiväkirjan PDF Driveen…", '#aaa');
+     const pr = await printLogbook(true, { save: true, dateIso: dm[3] + "-" + dm[2].padStart(2, "0") + "-" + dm[1].padStart(2, "0"), car: String(s.car) });
+     pdfNote = pr && pr.ok ? " 📄 Ajopäiväkirja tallennettu Driveen: " + pr.name : " (Ajopäiväkirjaa ei tallennettu: " + ((pr && pr.error) || "virhe") + ")";
+    }
+   } catch (e) { pdfNote = " (Ajopäiväkirjaa ei tallennettu: " + e.message + ")"; }
+   vrSetInfo((ok ? "✔ Tallennettu. " : "⚠ Tallennettu, mutta tarkista taulukosta. ") + "Vuoro " + (s.shift || "?") + (s.date ? " (" + s.date + ")" : "") + ", auto " + (s.car || "?") + ". " + (res.check || "") + (res.replaced ? " (päivitti aiemman rivin)" : "") + pdfNote, ok ? '#7ddf7d' : '#ffb74d');
   } catch (e) { vrSetInfo("Tallennus epäonnistui: " + e.message + ". Tiedot ovat vielä lomakkeella, yritä uudelleen.", '#ff6666'); }
   b.disabled = false;
  };
@@ -1750,14 +1760,17 @@
  w.document.open(); w.document.write(html); w.document.close();
  };
 
- window.printLogbook = async (perRide) => {
+ window.printLogbook = async (perRide, opts) => {
+ const save = !!(opts && opts.save);
  const msg = document.getElementById('printMsg');
- const w = window.open('', '_blank');
- if (!w) { msg.textContent = 'Selain esti ponnahdusikkunan. Salli ikkunat tälle sivulle.'; msg.style.display = 'block'; return; }
- try { w.document.write('<p style="font-family:sans-serif">Ladataan…</p>'); } catch (x) {}
- const d = shiftIsoToDate(document.getElementById('printDate').value);
- if (!d) { w.close(); msg.textContent = 'Valitse päivä.'; msg.style.display = 'block'; return; }
- const car = document.getElementById('printCar').value.trim().toLowerCase();
+ const w = save ? null : window.open('', '_blank');
+ if (!save && !w) { msg.textContent = 'Selain esti ponnahdusikkunan. Salli ikkunat tälle sivulle.'; msg.style.display = 'block'; return; }
+ if (w) { try { w.document.write('<p style="font-family:sans-serif">Ladataan…</p>'); } catch (x) {} }
+ const fail = (t) => { if (w) w.close(); if (save) return { ok: false, error: t }; msg.textContent = t; msg.style.display = 'block'; };
+ const d = shiftIsoToDate(save ? opts.dateIso : document.getElementById('printDate').value);
+ if (!d) return fail('Valitse päivä.');
+ const carRaw = (save ? String(opts.car || '') : document.getElementById('printCar').value).trim();
+ const car = carRaw.toLowerCase();
  const dayKey = shiftFmt(d);
  const rows = currentLogs.filter(r => {
  const rd = parseFinnishDate(r.date);
@@ -1766,10 +1779,10 @@
  if (car && String(r.car || '').trim().toLowerCase() !== car) return false;
  return true;
  }).sort((a, b) => String(a.time || '').localeCompare(String(b.time || ''), 'fi', { numeric: true }));
- if (rows.length === 0) { w.close(); msg.textContent = 'Ei tilauksia tälle päivälle' + (car ? ' ja autolle ' + car : '') + '.'; msg.style.display = 'block'; return; }
- msg.style.display = 'none';
+ if (rows.length === 0) return fail('Ei tilauksia tälle päivälle' + (car ? ' ja autolle ' + car : '') + '.');
+ if (!save) msg.style.display = 'none';
  const e = escapeHtml;
- const carNo = car ? document.getElementById('printCar').value.trim() : (rows[0].car || '');
+ const carNo = car ? carRaw : (rows[0].car || '');
  const mkLines = (rs) => rs.map(r => '<tr><td class="l">' + e(r.time || '') + (r.price ? '<br>' + e(String(r.price).replace('.', ',')) + ' €' : '') + '</td><td>' + e((r.from || '-') + ' → ' + (r.to || '-')) + '<br><span class="s">' + e([r.customer, r.phone, r.orderer ? 'tilaaja ' + r.orderer : '', r.billing ? 'lasku: ' + r.billing : '', r.type && /tavara/i.test(r.type) ? 'Tavarakuljetus' : ''].filter(Boolean).join(' · ')) + '</span></td></tr>').join('');
  const fs = 10;
  let shiftBrutto = {};
@@ -1811,10 +1824,61 @@
  + '<div class="rc">' + [['Matkamittari alussa', 's'], ['Matkamittari lopussa', 'e'], ['Ajettu', 'k']].map(x => eur(x[0], 'km', isNumCar(rsAll) ? e(String((shiftKm[String(rsAll[0].car || '').trim().toLowerCase()] || {})[x[1]] || '')) : '')).join('') + '<div class="tl">TILITYS</div>' + ['Kassa', 'Käteis', 'EMV', 'T-kortti', 'O-lasku', 'Ostot', 'Kela', 'Taksi-Helsinki -laskutus'].map(x => eur(x, '€', x === 'Kassa' ? fmtE(kassaOf(rsAll)) : (x === 'Käteis' && !isNumCar(rsAll) ? fmtE(rsAll.filter(isCar).reduce((a, r) => a + num(r.price), 0)) : ''))).join('') + '<div class="sign">Kuljettajan allekirjoitus</div></div></div></div></div>';
  };
  const BLANK = '<div class="page"></div>';
- if (perRide && rows.every(isAutoon)) { w.close(); msg.textContent = 'Kaikki päivän ajot on maksettu autoon, ei tulostettavia lehtiä.'; msg.style.display = 'block'; return; }
+ if (perRide && rows.every(isAutoon)) return fail('Kaikki päivän ajot on maksettu autoon, ei tulostettavia lehtiä.');
  const pagesHtml = perRide ? rows.filter(r => !isAutoon(r)).map(r => mkPage([r])).join('') : mkPage(rows);
  const html = '<!DOCTYPE html><html lang="fi"><head><meta charset="utf-8"><title>Ajopäiväkirja ' + dayKey + '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>@page{size:A4 portrait;margin:5mm}.page{position:relative;width:200mm;height:280mm;overflow:hidden;page-break-after:always}.page:last-child{page-break-after:auto}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:0 auto;width:200mm;font-size:10px}.bar{margin-bottom:8px}.bar button{font-size:16px;padding:10px 18px;margin-right:6px}@media print{.bar{display:none}body{margin:0;width:auto}}.rot{width:200mm}.note{font-weight:bold;font-size:10px;margin-bottom:2px}.h{display:flex;justify-content:space-between;align-items:flex-end;font-weight:900;font-size:15px;line-height:1.05;margin-bottom:3px}.h .t{font-size:14px}.c{border:1px solid #000;padding:2px 4px;min-height:27px}.c small,.u small,.chk small,.ln small{display:block;font-size:9.5px;font-weight:bold;color:#000}.c b{font-size:11px}.g4{display:grid;grid-template-columns:1fr 1.3fr 1fr 2.2fr}.g1{display:grid;grid-template-columns:1fr}.two{display:flex;gap:6px}.lc{flex:1;min-width:0}.rc{width:46mm;flex:none}.tl{font-weight:bold;margin-top:3px}.g3b{display:grid;grid-template-columns:1fr 1fr 1.4fr}.g3b .tauot{grid-column:3;grid-row:1/3}.chk{border:1px solid #000;padding:2px 4px;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:center}.chk small{width:100%}.chk span{white-space:nowrap}.chk i{display:inline-block;width:8px;height:8px;border:1px solid #000;margin-right:3px}table{border-collapse:collapse;width:100%;margin-top:4px}th,td{border:1px solid #000;padding:3px 4px;vertical-align:top;text-align:left;height:38px}th{background:#eee;font-size:8px;height:auto}td.l,th.l{width:22mm;white-space:nowrap}.s{color:#222}.til{margin-top:6px}.r{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.u{border-bottom:1px solid #000;min-height:31px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap}.u small{width:100%}.u span{margin-left:auto;text-align:right}.u b{margin-left:auto;margin-right:3px;font-size:11px}.u b+span{margin-left:0}.ln{border-bottom:1px solid #000;min-height:34px;margin-top:2px}.sign{margin-top:22px;border-top:1px solid #000;font-size:9px}</style></head><body><div class="bar"><button onclick="pdfShare(\'a4\',\'ajopaivakirja.pdf\',\'portrait\')">📤 TULOSTA (PDF)</button><button onclick="try{if(window.opener)window.opener.focus();}catch(x){}window.close();setTimeout(function(){location.href=\'' + location.href.split('#')[0] + '\'},300)">← Takaisin Kuljetuskirjaan</button></div>' + pagesHtml + PDF_SNIPPET + '</body></html>';
+ if (save) return await saveLogbookPdf(html.replace(PDF_SNIPPET, SAVE_SNIPPET), shiftIso(d), carNo);
  w.document.open(); w.document.write(html); w.document.close();
+ };
+ /* Ajopäiväkirjan PDF Driveen: piirretään piilotetussa iframessa ja lähetetään skriptille */
+ const SAVE_SNIPPET = `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script><script>window.addEventListener('load',function(){function done(o){parent.postMessage(Object.assign({pdfSave:1},o),'*');}try{if(typeof html2pdf==='undefined'){done({error:'PDF-kirjasto ei latautunut'});return;}var opt={margin:5,image:{type:'jpeg',quality:1},html2canvas:{scale:4},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}};var pages=document.querySelectorAll('.page');var wk;if(pages.length>1){wk=html2pdf().set(opt).from(pages[0]).toPdf();for(var i=1;i<pages.length;i++){(function(pg){wk=wk.get('pdf').then(function(pdf){pdf.addPage();}).from(pg).toContainer().toCanvas().toPdf();})(pages[i]);}}else{wk=html2pdf().set(opt).from(pages[0]).toPdf();}wk.output('blob').then(function(b){var fr=new FileReader();fr.onload=function(){done({b64:String(fr.result).split(',')[1]});};fr.readAsDataURL(b);}).catch(function(e){done({error:String(e)});});}catch(e){done({error:String(e)});}});<\/script>`;
+ window.saveLogbookPdf = (html, iso, carNo) => new Promise((resolve) => {
+ const safeCar = String(carNo || 'auto').trim().replace(/[^0-9A-Za-zÅÄÖåäö_-]+/g, '-').replace(/^-+|-+$/g, '') || 'auto';
+ const name = 'Ajopäiväkirja_' + iso + '_' + safeCar + '.pdf';
+ const ifr = document.createElement('iframe');
+ ifr.style.cssText = 'position:fixed;left:-10000px;top:0;width:820px;height:1200px;border:0;';
+ let finished = false;
+ const finish = (r) => { if (finished) return; finished = true; window.removeEventListener('message', onMsg); clearTimeout(tmo); try { ifr.remove(); } catch (x) {} resolve(r); };
+ const onMsg = async (ev) => {
+ if (ev.source !== ifr.contentWindow || !ev.data || !ev.data.pdfSave) return;
+ if (ev.data.error) { finish({ ok: false, error: 'PDF:n luonti epäonnistui: ' + ev.data.error }); return; }
+ try {
+ const res = await scriptCall({ action: 'logbookSave', name: name, date: iso, b64: ev.data.b64 });
+ if (!res || !res.ok) throw new Error((res && res.error) || 'ei yhteyttä');
+ finish({ ok: true, name: name, url: res.url, replaced: !!res.replaced });
+ } catch (e) { finish({ ok: false, error: 'Tallennus Driveen epäonnistui: ' + e.message }); }
+ };
+ const tmo = setTimeout(() => finish({ ok: false, error: 'PDF:n luonti aikakatkaistiin' }), 90000);
+ window.addEventListener('message', onMsg);
+ ifr.srcdoc = html;
+ document.body.appendChild(ifr);
+ });
+ /* Tallenna päivän ajopäiväkirjat (oma lehti jokaiselle ajolle) Driveen: jokaiselle autolle oma PDF */
+ window.saveLogbooksFromModal = async () => {
+ const msg = document.getElementById('printMsg');
+ const show = (t, col) => { msg.textContent = t; msg.style.color = col || '#ff8080'; msg.style.display = 'block'; };
+ const iso = document.getElementById('printDate').value;
+ const d = shiftIsoToDate(iso);
+ if (!d) { show('Valitse päivä.'); return; }
+ const carIn = document.getElementById('printCar').value.trim().toLowerCase();
+ const dayKey = shiftFmt(d);
+ const cars = [];
+ currentLogs.forEach(r => {
+ const rd = parseFinnishDate(r.date);
+ if (!rd || shiftFmt(rd) !== dayKey || r.voided || r.korjaus) return;
+ const c = String(r.car || '').trim();
+ if (!c || (carIn && c.toLowerCase() !== carIn)) return;
+ if (!cars.some(x => x.toLowerCase() === c.toLowerCase())) cars.push(c);
+ });
+ if (!cars.length) { show('Ei tilauksia tälle päivälle' + (carIn ? ' ja autolle ' + carIn : '') + '.'); return; }
+ const out = [];
+ for (const c of cars) {
+ show('Tallennetaan Driveen: ' + c + ' (' + (out.length + 1) + '/' + cars.length + ')…', '#aaa');
+ let r; try { r = await printLogbook(true, { save: true, dateIso: shiftIso(d), car: c }); } catch (e) { r = { ok: false, error: e.message }; }
+ out.push(r && r.ok ? '✔ ' + r.name + (r.replaced ? ' (päivitettiin)' : '') : '⚠ ' + c + ': ' + ((r && r.error) || 'virhe'));
+ }
+ show(out.join('\n'), out.every(x => x.charAt(0) === '✔') ? '#7ddf7d' : '#ffb74d');
+ msg.style.whiteSpace = 'pre-line';
  };
  /* ===== /Päivän tilauslista ===== */
  /* Päivämääräkentät aukeavat kalenterina (arvo säilyy muodossa pp.kk.vvvv) */
