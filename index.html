@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.12 | Päivitetty: 9.11.2026</div>
+<div class="v-tag">V38.13 | Päivitetty: 9.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1790,25 +1790,28 @@
  const fmtE = (n) => n ? n.toFixed(2).replace('.', ',') : '';
  const isCar = (r) => { const b = String(r.billing || '').trim(); return !(b !== '' && !/^(maksu\s+)?(autoon|käteinen|kateinen|kortti|mobilepay|luotto)/i.test(b) && !/maksaa|autoon|asiakas/i.test(b)); };
  const eur = (lab, unit, val) => '<div class="u"><small>' + lab + '</small>' + (val ? '<b>' + val + '</b>' : '') + '<span>' + unit + '</span></div>';
- const mkPage = (rs) => {
+ const isAutoon = (r) => /autoon/i.test(String(r.billing || ""));
+ const mkPage = (rsAll) => {
+ const rs = rsAll.filter(r => !isAutoon(r));
  const n = Math.max(5, rs.length);
  let trs = '';
  for (let i = 0; i < n; i++) {
  const r = rs[i];
  trs += r ? '<tr><td class="l">' + e(r.time || '') + (r.price ? '<br>' + e(String(r.price).replace('.', ',')) + ' €' : '') + '</td><td>' + e((r.from || '-') + ' → ' + (r.to || '-')) + '<br><span class="s">' + e([r.customer, r.phone, r.orderer ? 'tilaaja ' + r.orderer : '', r.billing ? 'lasku: ' + r.billing : '', r.type && /tavara/i.test(r.type) ? 'Tavarakuljetus' : ''].filter(Boolean).join(' · ')) + '</span></td></tr>' : '<tr><td class="l">&nbsp;</td><td>&nbsp;</td></tr>';
  }
- const car0 = perRide ? (rs[0].car || carNo) : carNo;
+ const car0 = perRide ? (rsAll[0].car || carNo) : carNo;
  const chk = ['Rekisteriote', 'Liikennelupa', 'Diesel-kortti', 'Autopuhelin', 'Laturi', 'LK-tägi', 'HTD-puhelin'].map(x => '<span><i></i>' + x + '</span>').join('');
  return '<div class="page"><div class="rot"><div class="note">Tilitykset tuotava vähintään kerran viikossa.</div><div class="h"><span>TAKSIPALVELU SIMONEN OY</span><span class="t">AJOPÄIVÄKIRJA</span></div>'
  + '<div class="g4">' + fld('Auto nro. (taksikupu)', car0) + fld('Auto rek.nro.:', '') + fld('Kuljettajan ID:', '25224') + fld('Kuljettajan sukunimi + etunimi', 'Aaltonen Jarmo') + '</div>'
- + '<div class="two"><div class="lc"><div class="g3b">' + fld('Aloitus pvm:', dayKey) + fld('Klo:', perRide ? (rs[0].time || '') : '') + '<div class="c tauot"><small>Tauot:</small></div>' + fld('Lopetus pvm:', dayKey) + fld('Klo:', '') + '</div>'
+ + '<div class="two"><div class="lc"><div class="g3b">' + fld('Aloitus pvm:', dayKey) + fld('Klo:', perRide ? (rsAll[0].time || '') : '') + '<div class="c tauot"><small>Tauot:</small></div>' + fld('Lopetus pvm:', dayKey) + fld('Klo:', '') + '</div>'
  + '<div class="chk"><small>Lähtiessä autossa oli</small>' + chk + '</div>'
  + '<table><thead><tr><th class="l">Poikkeavat ajot:</th><th>Laskutustiedot: klo-klo, mistä mihin (osoitteet), muuta huomioitavaa, asiakastiedot:</th></tr></thead><tbody>' + trs + '</tbody></table>'
  + '<div class="ln"><small>Huomautettavaa toimistolle:</small></div><div class="ln"><small>Auton kunto ennen vuoroa:</small></div><div class="ln"><small>Auton kunto vuoron jälkeen:</small></div></div>'
- + '<div class="rc">' + [['Matkamittari alussa', 's'], ['Matkamittari lopussa', 'e'], ['Ajettu', 'k']].map(x => eur(x[0], 'km', isNumCar(rs) ? e(String((shiftKm[String(rs[0].car || '').trim().toLowerCase()] || {})[x[1]] || '')) : '')).join('') + '<div class="tl">TILITYS</div>' + ['Kassa', 'Käteis', 'EMV', 'T-kortti', 'O-lasku', 'Ostot', 'Kela', 'Taksi-Helsinki -laskutus'].map(x => eur(x, '€', x === 'Kassa' ? fmtE(kassaOf(rs)) : (x === 'Käteis' && !isNumCar(rs) ? fmtE(rs.filter(isCar).reduce((a, r) => a + num(r.price), 0)) : ''))).join('') + '<div class="sign">Kuljettajan allekirjoitus</div></div></div></div></div>';
+ + '<div class="rc">' + [['Matkamittari alussa', 's'], ['Matkamittari lopussa', 'e'], ['Ajettu', 'k']].map(x => eur(x[0], 'km', isNumCar(rsAll) ? e(String((shiftKm[String(rsAll[0].car || '').trim().toLowerCase()] || {})[x[1]] || '')) : '')).join('') + '<div class="tl">TILITYS</div>' + ['Kassa', 'Käteis', 'EMV', 'T-kortti', 'O-lasku', 'Ostot', 'Kela', 'Taksi-Helsinki -laskutus'].map(x => eur(x, '€', x === 'Kassa' ? fmtE(kassaOf(rsAll)) : (x === 'Käteis' && !isNumCar(rsAll) ? fmtE(rsAll.filter(isCar).reduce((a, r) => a + num(r.price), 0)) : ''))).join('') + '<div class="sign">Kuljettajan allekirjoitus</div></div></div></div></div>';
  };
  const BLANK = '<div class="page"></div>';
- const pagesHtml = perRide ? rows.map(r => mkPage([r])).join('') : mkPage(rows);
+ if (perRide && rows.every(isAutoon)) { w.close(); msg.textContent = 'Kaikki päivän ajot on maksettu autoon, ei tulostettavia lehtiä.'; msg.style.display = 'block'; return; }
+ const pagesHtml = perRide ? rows.filter(r => !isAutoon(r)).map(r => mkPage([r])).join('') : mkPage(rows);
  const html = '<!DOCTYPE html><html lang="fi"><head><meta charset="utf-8"><title>Ajopäiväkirja ' + dayKey + '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>@page{size:A4 portrait;margin:5mm}.page{position:relative;width:200mm;height:280mm;overflow:hidden;page-break-after:always}.page:last-child{page-break-after:auto}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:0 auto;width:200mm;font-size:10px}.bar{margin-bottom:8px}.bar button{font-size:16px;padding:10px 18px;margin-right:6px}@media print{.bar{display:none}body{margin:0;width:auto}}.rot{width:200mm}.note{font-weight:bold;font-size:10px;margin-bottom:2px}.h{display:flex;justify-content:space-between;align-items:flex-end;font-weight:900;font-size:15px;line-height:1.05;margin-bottom:3px}.h .t{font-size:14px}.c{border:1px solid #000;padding:2px 4px;min-height:27px}.c small,.u small,.chk small,.ln small{display:block;font-size:8px;color:#222}.c b{font-size:11px}.g4{display:grid;grid-template-columns:1fr 1.3fr 1fr 2.2fr}.g1{display:grid;grid-template-columns:1fr}.two{display:flex;gap:6px}.lc{flex:1;min-width:0}.rc{width:46mm;flex:none}.tl{font-weight:bold;margin-top:3px}.g3b{display:grid;grid-template-columns:1fr 1fr 1.4fr}.g3b .tauot{grid-column:3;grid-row:1/3}.chk{border:1px solid #000;padding:2px 4px;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:center}.chk small{width:100%}.chk span{white-space:nowrap}.chk i{display:inline-block;width:8px;height:8px;border:1px solid #000;margin-right:3px}table{border-collapse:collapse;width:100%;margin-top:4px}th,td{border:1px solid #000;padding:3px 4px;vertical-align:top;text-align:left;height:38px}th{background:#eee;font-size:8px;height:auto}td.l,th.l{width:22mm;white-space:nowrap}.s{color:#222}.til{margin-top:6px}.r{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.u{border-bottom:1px solid #000;min-height:31px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap}.u small{width:100%}.u span{margin-left:auto;text-align:right}.u b{margin-left:auto;margin-right:3px;font-size:11px}.u b+span{margin-left:0}.ln{border-bottom:1px solid #000;min-height:34px;margin-top:2px}.sign{margin-top:22px;border-top:1px solid #000;font-size:9px}</style></head><body><div class="bar"><button onclick="pdfShare(\'a4\',\'ajopaivakirja.pdf\',\'portrait\')">📤 TULOSTA (PDF)</button><button onclick="try{if(window.opener)window.opener.focus();}catch(x){}window.close();setTimeout(function(){location.href=\'' + location.href.split('#')[0] + '\'},300)">← Takaisin Kuljetuskirjaan</button></div>' + pagesHtml + PDF_SNIPPET + '</body></html>';
  w.document.open(); w.document.write(html); w.document.close();
  };
