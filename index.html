@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.11 | Päivitetty: 9.11.2026</div>
+<div class="v-tag">V38.12 | Päivitetty: 9.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1773,13 +1773,14 @@
  const mkLines = (rs) => rs.map(r => '<tr><td class="l">' + e(r.time || '') + (r.price ? '<br>' + e(String(r.price).replace('.', ',')) + ' €' : '') + '</td><td>' + e((r.from || '-') + ' → ' + (r.to || '-')) + '<br><span class="s">' + e([r.customer, r.phone, r.orderer ? 'tilaaja ' + r.orderer : '', r.billing ? 'lasku: ' + r.billing : '', r.type && /tavara/i.test(r.type) ? 'Tavarakuljetus' : ''].filter(Boolean).join(' · ')) + '</span></td></tr>').join('');
  const fs = 10;
  let shiftBrutto = {};
+ let shiftKm = {};
  if (rows.some(r => /^\d+$/.test(String(r.car || '').trim()))) {
  try {
  const iso = shiftIso(d);
  const idToken = await auth.currentUser.getIdToken();
  const resp = await fetch(SHEET_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'shifts', idToken: idToken, from: iso, to: iso }) });
  const jr = await resp.json();
- if (jr && jr.ok && Array.isArray(jr.shifts)) jr.shifts.forEach(x => { if (Number(x.brutto)) shiftBrutto[String(x.car || '').trim().toLowerCase()] = Number(x.brutto); });
+ if (jr && jr.ok && Array.isArray(jr.shifts)) jr.shifts.forEach(x => { const ck = String(x.car || '').trim().toLowerCase(); if (Number(x.brutto)) shiftBrutto[ck] = Number(x.brutto); shiftKm[ck] = { s: x.kmStart || '', e: x.kmEnd || '', k: x.kmDriven || '' }; });
  } catch (x) { console.error(x); }
  }
  const kassaOf = (rs) => { const c = String(rs[0].car || '').trim().toLowerCase(); if (/^\d+$/.test(c)) return shiftBrutto[c] || 0; return rs.reduce((a, r) => a + num(r.price), 0); };
@@ -1804,7 +1805,7 @@
  + '<div class="chk"><small>Lähtiessä autossa oli</small>' + chk + '</div>'
  + '<table><thead><tr><th class="l">Poikkeavat ajot:</th><th>Laskutustiedot: klo-klo, mistä mihin (osoitteet), muuta huomioitavaa, asiakastiedot:</th></tr></thead><tbody>' + trs + '</tbody></table>'
  + '<div class="ln"><small>Huomautettavaa toimistolle:</small></div><div class="ln"><small>Auton kunto ennen vuoroa:</small></div><div class="ln"><small>Auton kunto vuoron jälkeen:</small></div></div>'
- + '<div class="rc">' + ['Matkamittari alussa', 'Matkamittari lopussa', 'Ajettu'].map(x => eur(x, 'km')).join('') + '<div class="tl">TILITYS</div>' + ['Kassa', 'Käteis', 'EMV', 'T-kortti', 'O-lasku', 'Ostot', 'Kela', 'Taksi-Helsinki -laskutus'].map(x => eur(x, '€', x === 'Kassa' ? fmtE(kassaOf(rs)) : (x === 'Käteis' && !isNumCar(rs) ? fmtE(rs.filter(isCar).reduce((a, r) => a + num(r.price), 0)) : ''))).join('') + '<div class="sign">Kuljettajan allekirjoitus</div></div></div></div></div>';
+ + '<div class="rc">' + [['Matkamittari alussa', 's'], ['Matkamittari lopussa', 'e'], ['Ajettu', 'k']].map(x => eur(x[0], 'km', isNumCar(rs) ? e(String((shiftKm[String(rs[0].car || '').trim().toLowerCase()] || {})[x[1]] || '')) : '')).join('') + '<div class="tl">TILITYS</div>' + ['Kassa', 'Käteis', 'EMV', 'T-kortti', 'O-lasku', 'Ostot', 'Kela', 'Taksi-Helsinki -laskutus'].map(x => eur(x, '€', x === 'Kassa' ? fmtE(kassaOf(rs)) : (x === 'Käteis' && !isNumCar(rs) ? fmtE(rs.filter(isCar).reduce((a, r) => a + num(r.price), 0)) : ''))).join('') + '<div class="sign">Kuljettajan allekirjoitus</div></div></div></div></div>';
  };
  const BLANK = '<div class="page"></div>';
  const pagesHtml = perRide ? rows.map(r => mkPage([r])).join('') : mkPage(rows);
