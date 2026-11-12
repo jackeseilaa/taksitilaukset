@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.16 | Päivitetty: 11.11.2026</div>
+<div class="v-tag">V38.17 | Päivitetty: 12.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -665,14 +665,22 @@
  // ===== AUTENTIKOINTI =====
  document.getElementById('btnLogin')?.addEventListener('click', async () => {
      const provider = new GoogleAuthProvider();
+     provider.setCustomParameters({ prompt: 'select_account' });
+     const errEl = document.getElementById('auth-error');
+     errEl.textContent = '';
+     /* Safari (iPad/iPhone): uudelleenohjaus firebaseapp.com-osoitteen kautta ei palauta kirjautumista (ITP), joten siellä ei käytetä sitä */
+     const isApple = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
      try {
          await signInWithPopup(auth, provider);
      } catch (e) {
-         if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+         const popupIssue = e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request';
+         if (popupIssue && isApple) {
+             errEl.textContent = 'Kirjautumisikkuna ei auennut tai suljettiin (' + e.code + '). Salli ponnahdusikkunat Safarin asetuksista ja paina nappia uudelleen.';
+         } else if (popupIssue) {
              try { await signInWithRedirect(auth, provider); }
-             catch (e2) { document.getElementById('auth-error').textContent = 'Kirjautuminen epäonnistui: ' + e2.message; }
+             catch (e2) { errEl.textContent = 'Kirjautuminen epäonnistui: ' + e2.message; }
          } else {
-             document.getElementById('auth-error').textContent = 'Kirjautuminen epäonnistui: ' + e.message;
+             errEl.textContent = 'Kirjautuminen epäonnistui (' + (e.code || 'tuntematon') + '): ' + e.message;
          }
      }
  });
