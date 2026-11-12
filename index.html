@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.17 | Päivitetty: 12.11.2026</div>
+<div class="v-tag">V38.18 | Päivitetty: 12.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -724,6 +724,11 @@
  if (sb) sb.addEventListener('input', () => { clearTimeout(tmr); tmr = setTimeout(() => { if (typeof currentLogs !== 'undefined') renderTable(); }, 150); });
  if (sc) sc.addEventListener('click', () => { sb.value = ''; renderTable(); sb.focus(); });
  })();
+ /* Haku: pelkkä tekstisana täsmää sanan alkuun (kone = Kone Oy, ei lentokone); numerot ja sekamuodot kuten ennen osittain */
+ function matchTerm(h, t) {
+ if (/[0-9]/.test(t) || !/^[a-zäöåé-]+$/.test(t)) return h.indexOf(t) >= 0;
+ return new RegExp('(^|[^a-zäöåé])' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(h);
+ }
  function renderTable() {
  console.log("🎨 renderTable() kutsuttu, currentLogs.length =", currentLogs.length);
  document.getElementById('dataCount').textContent = currentLogs.length;
@@ -735,7 +740,7 @@
  const tbody = document.getElementById('logs');
  tbody.innerHTML = '';
  const sc = document.getElementById('searchClear'); if (sc) sc.style.display = terms.length ? '' : 'none';
- const sorted = currentLogs.filter(r => { if (!terms.length) return true; const h = hay(r); return terms.every(t => h.indexOf(t) >= 0); }).sort((a, b) => {
+ const sorted = currentLogs.filter(r => { if (!terms.length) return true; const h = hay(r); return terms.every(t => matchTerm(h, t)); }).sort((a, b) => {
  const dateA = parseFinnishDate(a.date);
  const dateB = parseFinnishDate(b.date);
  if (!dateA || !dateB) return 0;
