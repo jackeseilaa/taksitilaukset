@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.19 | Päivitetty: 13.11.2026</div>
+<div class="v-tag">V38.20 | Päivitetty: 13.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1754,7 +1754,7 @@
  if (!d) { msg.textContent = 'Valitse päivä.'; msg.style.display = 'block'; return; }
  const car = document.getElementById('printCar').value.trim().toLowerCase();
  const dayKey = shiftFmt(d);
- const rows = currentLogs.filter(r => {
+ let rows = currentLogs.filter(r => {
  const rd = parseFinnishDate(r.date);
  if (!rd || shiftFmt(rd) !== dayKey) return false;
  if (r.voided || r.korjaus) return false;
@@ -1773,6 +1773,14 @@
  w.document.open(); w.document.write(html); w.document.close();
  };
 
+ const fetchDayShifts = async (iso) => {
+ try {
+ const idToken = await auth.currentUser.getIdToken();
+ const resp = await fetch(SHEET_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'shifts', idToken: idToken, from: iso, to: iso }) });
+ const jr = await resp.json();
+ return (jr && jr.ok && Array.isArray(jr.shifts)) ? jr.shifts : [];
+ } catch (x) { console.error(x); return []; }
+ };
  window.printLogbook = async (perRide, opts) => {
  const save = !!(opts && opts.save);
  const msg = document.getElementById('printMsg');
@@ -1785,13 +1793,19 @@
  const carRaw = (save ? String(opts.car || '') : document.getElementById('printCar').value).trim();
  const car = carRaw.toLowerCase();
  const dayKey = shiftFmt(d);
- const rows = currentLogs.filter(r => {
+ let rows = currentLogs.filter(r => {
  const rd = parseFinnishDate(r.date);
  if (!rd || shiftFmt(rd) !== dayKey) return false;
  if (r.voided || r.korjaus) return false;
  if (car && String(r.car || '').trim().toLowerCase() !== car) return false;
  return true;
  }).sort((a, b) => String(a.time || '').localeCompare(String(b.time || ''), 'fi', { numeric: true }));
+ /* Numeroautolla vuoro voi olla ilman yhtään tilausta (kaikki maksettu autoon): lehti tehdään taulukon vuorotiedoista */
+ if (rows.length === 0 && save && /^\d+$/.test(carRaw)) {
+ const shs = await fetchDayShifts(shiftIso(d));
+ const x = shs.find(y => String(y.car || '').trim().toLowerCase() === car);
+ if (x) rows = [{ car: carRaw, time: x.start || '', date: dayKey, billing: 'autoon', price: '', from: '', to: '' }];
+ }
  if (rows.length === 0) return fail('Ei tilauksia tälle päivälle' + (car ? ' ja autolle ' + car : '') + '.');
  if (!save) msg.style.display = 'none';
  const e = escapeHtml;
@@ -1882,6 +1896,11 @@
  const c = String(r.car || '').trim();
  if (!c || (carIn && c.toLowerCase() !== carIn)) return;
  if (!cars.some(x => x.toLowerCase() === c.toLowerCase())) cars.push(c);
+ });
+ (await fetchDayShifts(shiftIso(d))).forEach(x => {
+ const c = String(x.car || '').trim();
+ if (!/^\d+$/.test(c) || (carIn && c.toLowerCase() !== carIn)) return;
+ if (!cars.some(y => y.toLowerCase() === c.toLowerCase())) cars.push(c);
  });
  if (!cars.length) { show('Ei tilauksia tälle päivälle' + (carIn ? ' ja autolle ' + carIn : '') + '.'); return; }
  const out = [];
