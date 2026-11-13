@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.24 | Päivitetty: 13.11.2026</div>
+<div class="v-tag">V38.25 | Päivitetty: 13.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -110,6 +110,7 @@
  <button class="btn-csv export-subscriber" onclick="openBillModal()">LATAA LASKUTETTAVAT (EXCEL)</button>
  <button class="btn-csv export-subscriber" onclick="openShiftModal()">LASKULIITE: AJOVUOROT (EXCEL)</button>
  <button class="btn-csv" onclick="openPrintModal()" style="background:#4a3a1a;">🖨 TULOSTA PÄIVÄN LISTA</button>
+ <button class="btn-csv" onclick="openKmModal()" style="background:#1a4a4a;">🚗 AJOVUORON KILOMETRIT (ALOITUS / LOPETUS)</button>
  <button class="btn-csv" id="btnClear" onclick="clearForm()" style="background: #3a2a2a;">TYHJENNÄ</button>
  <button class="btn-cancel" id="btnCancel" onclick="cancelEdit()">PERUUTA MUOKKAUS</button>
 </div>
@@ -185,6 +186,22 @@
  <div class="modal-buttons">
  <button class="modal-btn ok" id="billDl" onclick="downloadBillXlsx()" disabled>LATAA EXCEL</button>
  <button class="modal-btn cancel" onclick="closeBillModal()">SULJE</button>
+ </div>
+ </div>
+</div>
+<div class="modal-overlay" id="kmModal">
+ <div class="modal-box" style="max-width:520px;width:92%;">
+ <div class="modal-title">Ajovuoron kilometrit</div>
+ <div class="modal-field"><label>Päivä</label><input type="date" id="kmDate"></div>
+ <div class="modal-field"><label>Auto</label><select id="kmCar" style="width:100%;font-size:1.2rem;padding:12px;"></select></div>
+ <div class="modal-field"><label>Aloitus-km (auton oma mittari)</label><input type="text" inputmode="numeric" id="kmStart" placeholder="esim. 280423" style="font-size:1.3rem;padding:12px;width:100%;"></div>
+ <div class="modal-field"><label>Lopetus-km (auton oma mittari)</label><input type="text" inputmode="numeric" id="kmEnd" placeholder="esim. 280595" style="font-size:1.3rem;padding:12px;width:100%;"></div>
+ <div class="modal-field" id="kmHint" style="color:#aaa;font-size:0.9rem;"></div>
+ <div class="modal-field"><label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="kmPdf" checked> Päivitä päivän ajopäiväkirjan PDF Driveen</label></div>
+ <div class="modal-field" id="kmMsg" style="display:none;white-space:pre-line;"></div>
+ <div class="modal-buttons" style="flex-direction:column;">
+ <button class="modal-btn ok" id="kmSaveBtn" onclick="saveKm()">💾 TALLENNA KILOMETRIT</button>
+ <button class="modal-btn cancel" onclick="closeKmModal()">SULJE</button>
  </div>
  </div>
 </div>
@@ -1916,6 +1933,85 @@
  }
  show(out.join('\n'), out.every(x => x.charAt(0) === '✔') ? '#7ddf7d' : '#ffb74d');
  msg.style.whiteSpace = 'pre-line';
+ };
+ /* ===== Ajovuoron kilometrit (auton oma mittari) ===== */
+ const kmShiftCache = {};
+ const fetchShiftRange = async (fromIso, toIso) => {
+ try {
+ const idToken = await auth.currentUser.getIdToken();
+ const resp = await fetch(SHEET_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'shifts', idToken: idToken, from: fromIso, to: toIso }) });
+ const jr = await resp.json();
+ return (jr && jr.ok && Array.isArray(jr.shifts)) ? jr.shifts : [];
+ } catch (x) { console.error(x); return []; }
+ };
+ const kmMsg = (t, col) => { const m = document.getElementById('kmMsg'); m.textContent = t; m.style.color = col || '#ff8080'; m.style.display = t ? 'block' : 'none'; };
+ const kmNum = (v) => { const n = parseInt(String(v || '').replace(/\s/g, ''), 10); return isNaN(n) ? null : n; };
+ window.openKmModal = async () => {
+ document.getElementById('kmDate').value = shiftIso(new Date());
+ document.getElementById('kmStart').value = ''; document.getElementById('kmEnd').value = '';
+ document.getElementById('kmHint').textContent = ''; kmMsg('');
+ document.getElementById('kmModal').classList.add('active');
+ await kmLoadDay();
+ };
+ window.closeKmModal = () => document.getElementById('kmModal').classList.remove('active');
+ /* Hakee päivän vuorot taulukosta (autot) ja ehdottaa aloituslukemaksi saman auton edellistä lopetuslukemaa */
+ const kmLoadDay = async () => {
+ const iso = document.getElementById('kmDate').value;
+ const sel = document.getElementById('kmCar');
+ sel.innerHTML = ''; kmMsg('');
+ if (!shiftIsoToDate(iso)) return;
+ const d = shiftIsoToDate(iso);
+ const from = new Date(d.getTime() - 60 * 86400000);
+ kmMsg('Haetaan päivän vuorot…', '#aaa');
+ const all = await fetchShiftRange(shiftIso(from), iso);
+ kmShiftCache.all = all; kmShiftCache.iso = iso;
+ const day = all.filter(x => x.date === iso);
+ kmMsg('');
+ if (!day.length) { sel.innerHTML = '<option value="">(ei vuoroja taulukossa tälle päivälle)</option>'; document.getElementById('kmHint').textContent = ''; return; }
+ day.forEach(x => { const o = document.createElement('option'); o.value = String(x.car); o.textContent = String(x.car); sel.appendChild(o); });
+ kmFillCar();
+ };
+ const kmFillCar = () => {
+ const iso = document.getElementById('kmDate').value;
+ const car = document.getElementById('kmCar').value;
+ const all = kmShiftCache.all || [];
+ const cur = all.find(x => x.date === iso && String(x.car) === car);
+ const prev = all.filter(x => x.date < iso && String(x.car) === car && kmNum(x.kmEnd) !== null).sort((a, b) => a.date < b.date ? -1 : 1).pop();
+ const hint = document.getElementById('kmHint');
+ const sIn = document.getElementById('kmStart'), eIn = document.getElementById('kmEnd');
+ sIn.value = cur && kmNum(cur.kmStart) !== null ? String(kmNum(cur.kmStart)) : (prev ? String(kmNum(prev.kmEnd)) : '');
+ eIn.value = cur && kmNum(cur.kmEnd) !== null ? String(kmNum(cur.kmEnd)) : '';
+ hint.textContent = prev ? 'Edellinen lopetuslukema tälle autolle: ' + kmNum(prev.kmEnd) + ' km (' + prev.date.split('-').reverse().join('.') + ')' + (cur && kmNum(cur.kmStart) === null ? ' – ehdotettu aloitukseksi' : '') : '';
+ };
+ document.getElementById('kmDate').addEventListener('change', kmLoadDay);
+ document.getElementById('kmCar').addEventListener('change', kmFillCar);
+ window.saveKm = async () => {
+ const iso = document.getElementById('kmDate').value, car = document.getElementById('kmCar').value;
+ const ks = kmNum(document.getElementById('kmStart').value), ke = kmNum(document.getElementById('kmEnd').value);
+ if (!shiftIsoToDate(iso)) { kmMsg('Valitse päivä.'); return; }
+ if (!car) { kmMsg('Valitse auto. Päivälle ei löytynyt vuoroa taulukosta.'); return; }
+ if (ks === null && ke === null) { kmMsg('Syötä aloitus- tai lopetuskilometrit.'); return; }
+ if (ks !== null && ke !== null && ke < ks) { kmMsg('Lopetuslukema ei voi olla pienempi kuin aloituslukema.'); return; }
+ const prev = (kmShiftCache.all || []).filter(x => x.date < iso && String(x.car) === car && kmNum(x.kmEnd) !== null).sort((a, b) => a.date < b.date ? -1 : 1).pop();
+ const sus = [];
+ if (ks !== null && prev && ks < kmNum(prev.kmEnd)) sus.push('Aloituslukema (' + ks + ') on pienempi kuin edellinen lopetuslukema (' + kmNum(prev.kmEnd) + ').');
+ if (ks !== null && ke !== null && ke - ks > 1500) sus.push('Ajettu matka on ' + (ke - ks) + ' km, tarkista lukemat.');
+ if (sus.length && !confirm(sus.join('\n') + '\nTallennetaanko silti?')) return;
+ const b = document.getElementById('kmSaveBtn'); b.disabled = true;
+ try {
+ kmMsg('Tallennetaan taulukkoon…', '#aaa');
+ const res = await scriptCall({ action: 'kmSave', date: iso, car: car, kmStart: ks, kmEnd: ke });
+ if (!res || !res.ok) throw new Error((res && res.error) || 'ei yhteyttä');
+ let t = '✔ Tallennettu: ' + res.car + ' ' + iso.split('-').reverse().join('.') + ' · ' + (res.kmStart !== null ? res.kmStart : '–') + ' → ' + (res.kmEnd !== null ? res.kmEnd : '–') + (res.kmDriven !== null ? ' (' + res.kmDriven + ' km)' : '');
+ kmMsg(t, '#7ddf7d');
+ if (document.getElementById('kmPdf').checked) {
+ kmMsg(t + '\nPäivitetään ajopäiväkirjan PDF Driveen…', '#7ddf7d');
+ let pr; try { pr = await printLogbook(true, { save: true, dateIso: iso, car: car }); } catch (e) { pr = { ok: false, error: e.message }; }
+ kmMsg(t + '\n' + (pr && pr.ok ? '📄 PDF päivitetty: ' + pr.name : '(PDF:ää ei päivitetty: ' + ((pr && pr.error) || 'virhe') + ')'), '#7ddf7d');
+ }
+ delete kmShiftCache.all;
+ } catch (e) { kmMsg('Tallennus epäonnistui: ' + e.message); }
+ b.disabled = false;
  };
  /* ===== /Päivän tilauslista ===== */
  /* Päivämääräkentät aukeavat kalenterina (arvo säilyy muodossa pp.kk.vvvv) */
