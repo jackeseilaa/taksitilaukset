@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.20 | Päivitetty: 13.11.2026</div>
+<div class="v-tag">V38.21 | Päivitetty: 13.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1814,7 +1814,7 @@
  const fs = 10;
  let shiftBrutto = {};
  let shiftKm = {};
- if (rows.some(r => /^\d+$/.test(String(r.car || '').trim()))) {
+ {
  try {
  const iso = shiftIso(d);
  const idToken = await auth.currentUser.getIdToken();
@@ -1848,7 +1848,7 @@
  + '<div class="chk"><small>Lähtiessä autossa oli</small>' + chk + '</div>'
  + '<table><thead><tr><th class="l">Poikkeavat ajot:</th><th>Laskutustiedot: klo-klo, mistä mihin (osoitteet), muuta huomioitavaa, asiakastiedot:</th></tr></thead><tbody>' + trs + '</tbody></table>'
  + '<div class="ln"><small>Huomautettavaa toimistolle:</small></div><div class="ln"><small>Auton kunto ennen vuoroa:</small></div><div class="ln"><small>Auton kunto vuoron jälkeen:</small></div></div>'
- + '<div class="rc">' + [['Matkamittari alussa', 's'], ['Matkamittari lopussa', 'e'], ['Ajettu', 'k']].map(x => eur(x[0], 'km', isNumCar(rsAll) ? e(String((shiftKm[String(rsAll[0].car || '').trim().toLowerCase()] || {})[x[1]] || '')) : '')).join('') + '<div class="tl">TILITYS</div>' + ['Kassa', 'Käteis', 'EMV', 'T-kortti', 'O-lasku', 'Ostot', 'Kela', 'Taksi-Helsinki -laskutus'].map(x => eur(x, '€', x === 'Kassa' ? fmtE(kassaOf(rsAll)) : (x === 'Käteis' && !isNumCar(rsAll) ? fmtE(rsAll.filter(isCar).reduce((a, r) => a + num(r.price), 0)) : ''))).join('') + '<div class="sign">Kuljettajan allekirjoitus</div></div></div></div></div>';
+ + '<div class="rc">' + [['Matkamittari alussa', 's'], ['Matkamittari lopussa', 'e'], ['Ajettu', 'k']].map(x => eur(x[0], 'km', e(String((shiftKm[String(rsAll[0].car || '').trim().toLowerCase()] || {})[x[1]] || '')))).join('') + '<div class="tl">TILITYS</div>' + ['Kassa', 'Käteis', 'EMV', 'T-kortti', 'O-lasku', 'Ostot', 'Kela', 'Taksi-Helsinki -laskutus'].map(x => eur(x, '€', x === 'Kassa' ? fmtE(kassaOf(rsAll)) : (x === 'Käteis' && !isNumCar(rsAll) ? fmtE(rsAll.filter(isCar).reduce((a, r) => a + num(r.price), 0)) : ''))).join('') + '<div class="sign">Kuljettajan allekirjoitus</div></div></div></div></div>';
  };
  const BLANK = '<div class="page"></div>';
  /* Vuorosta tulee ajopäiväkirja, vaikka kaikki ajot olisi maksettu autoon: silloin yksi lehti ilman ajorivejä */
