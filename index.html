@@ -69,7 +69,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.28 | Päivitetty: 14.11.2026</div>
+<div class="v-tag">V38.27 | Päivitetty: 14.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1761,7 +1761,7 @@
  let logbookBgCache = null;
  const loadLogbookBg = async () => {
  if (logbookBgCache) return logbookBgCache;
- const bl = await fetch('ajopaivakirja_pohja.png?v=3828', { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error('Ajopäiväkirjan pohjakuva ei latautunut'); return r.blob(); });
+ const bl = await fetch('ajopaivakirja_pohja.png?v=38', { cache: 'force-cache' }).then(r => { if (!r.ok) throw new Error('Ajopäiväkirjan pohjakuva ei latautunut'); return r.blob(); });
  logbookBgCache = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(bl); });
  return logbookBgCache;
  };
@@ -1895,7 +1895,7 @@
  const oneSheet = /^(\d+|smb)$/i.test(String((rows[0] || {}).car || '').trim());
  const chunkRows = (arr, n) => { const o = []; for (let i = 0; i < arr.length; i += n) o.push(arr.slice(i, i + n)); return o; };
  const pagesHtml = perRide ? (rows.every(isAutoon) ? mkPage(rows) : (oneSheet ? chunkRows(rows.filter(r => !isAutoon(r)), 8).map(c => mkPage(c)).join('') : rows.filter(r => !isAutoon(r)).map(r => mkPage([r])).join('') + (rows.some(isAutoon) ? mkPage(rows.filter(isAutoon)) : ''))) : chunkRows(rows, 8).map(c => mkPage(c)).join('');
- const html = '<!DOCTYPE html><html lang="fi"><head><meta charset="utf-8"><title>Ajopäiväkirja ' + dayKey + '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>@page{size:A4 portrait;margin:5mm}.page{position:relative;width:200mm;height:280mm;overflow:hidden;page-break-after:always}.page:last-child{page-break-after:auto}*{box-sizing:border-box}body{font-family:Myriad Pro,Myriad Pro Cond,Arial,Liberation Sans,Helvetica,sans-serif;color:#000;margin:0 auto;width:200mm}.bar{margin-bottom:8px}.bar button{font-size:16px;padding:10px 18px;margin-right:6px}@media print{.bar{display:none}body{margin:0;width:auto}}.form{position:relative;width:200mm;height:152.2mm;background-size:100% 100%;background-repeat:no-repeat}.o{position:absolute;display:flex;align-items:center;overflow:hidden;line-height:1.1}.o .s{color:#222}</style></head><body><div class="bar"><button onclick="pdfShare(\'a4\',\'ajopaivakirja.pdf\',\'portrait\')">📤 TULOSTA (PDF)</button><button onclick="try{if(window.opener)window.opener.focus();}catch(x){}window.close();setTimeout(function(){location.href=\'' + location.href.split('#')[0] + '\'},300)">← Takaisin Kuljetuskirjaan</button></div>' + pagesHtml + PDF_SNIPPET + '</body></html>';
+ const html = '<!DOCTYPE html><html lang="fi"><head><meta charset="utf-8"><title>Ajopäiväkirja ' + dayKey + '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>@page{size:A4 portrait;margin:5mm}.page{position:relative;width:200mm;height:280mm;overflow:hidden;page-break-after:always}.page:last-child{page-break-after:auto}*{box-sizing:border-box}body{font-family:Myriad Pro,Myriad Pro Cond,Arial Narrow,Liberation Sans Narrow,Arial,Helvetica,sans-serif;color:#000;margin:0 auto;width:200mm}.bar{margin-bottom:8px}.bar button{font-size:16px;padding:10px 18px;margin-right:6px}@media print{.bar{display:none}body{margin:0;width:auto}}.form{position:relative;width:200mm;height:152.2mm;background-size:100% 100%;background-repeat:no-repeat}.o{position:absolute;display:flex;align-items:center;overflow:hidden;line-height:1.1}.o .s{color:#222}</style></head><body><div class="bar"><button onclick="pdfShare(\'a4\',\'ajopaivakirja.pdf\',\'portrait\')">📤 TULOSTA (PDF)</button><button onclick="try{if(window.opener)window.opener.focus();}catch(x){}window.close();setTimeout(function(){location.href=\'' + location.href.split('#')[0] + '\'},300)">← Takaisin Kuljetuskirjaan</button></div>' + pagesHtml + PDF_SNIPPET + '</body></html>';
  if (save) return await saveLogbookPdf(html.replace(PDF_SNIPPET, SAVE_SNIPPET), shiftIso(d), carNo);
  w.document.open(); w.document.write(html); w.document.close();
  };
