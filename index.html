@@ -72,7 +72,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.42 | Päivitetty: 17.11.2026</div>
+<div class="v-tag">V38.43 | Päivitetty: 17.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -762,11 +762,12 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  tbody.innerHTML = '';
  const sc = document.getElementById('searchClear'); if (sc) sc.style.display = terms.length ? '' : 'none';
  const sorted = currentLogs.filter(r => { if (!terms.length) return true; const h = hay(r); return terms.every(t => matchTerm(h, t)); }).sort((a, b) => {
- const dateA = parseFinnishDate(a.date);
- const dateB = parseFinnishDate(b.date);
- if (!dateA || !dateB) return 0;
- if (dateB - dateA !== 0) return dateB - dateA;
- return (b.time || '').localeCompare(a.time || '');
+ // Päivät uusin ensin, saman päivän ajot kellonaikajärjestyksessä (aikaisin ensin)
+ const dA = parseFinnishDate(a.date), dB = parseFinnishDate(b.date);
+ const tA = dA ? dA.getTime() : 0, tB = dB ? dB.getTime() : 0;
+ if (tB !== tA) return tB - tA;
+ const mins = (t) => { const m = String(t || '').match(/(\d{1,2})[.:](\d{2})/); return m ? (+m[1]) * 60 + (+m[2]) : 9999; };
+ return mins(a.time) - mins(b.time);
  });
  if (terms.length) document.getElementById('dataCount').textContent = sorted.length + ' / ' + currentLogs.length;
  sorted.forEach(r => {
