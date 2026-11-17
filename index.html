@@ -38,6 +38,8 @@
  .btn-cancel.show { display: block; }
  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
  .modal-overlay.active { display: flex; }
+ #kmModal .modal-box { box-sizing: border-box; overflow-x: hidden; }
+ #kmModal input, #kmModal select { box-sizing: border-box; max-width: 100%; min-width: 0; }
  .modal-box { background: var(--surface); border: 2px solid var(--accent); border-radius: 8px; padding: 20px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto; }
  .modal-title { color: var(--accent); font-weight: bold; margin-bottom: 15px; font-size: 1.1rem; }
  .modal-field { margin-bottom: 12px; }
@@ -70,7 +72,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.41 | Päivitetty: 16.11.2026</div>
+<div class="v-tag">V38.42 | Päivitetty: 17.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1992,7 +1994,12 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  };
  document.getElementById('kmDate').addEventListener('change', kmLoadDay);
  document.getElementById('kmCar').addEventListener('change', kmFillCar);
+ let kmConfirmKey = '';
  window.saveKm = async () => {
+ kmMsg('Tarkistetaan…', '#aaa');
+ try { await saveKmInner(); } catch (e) { kmMsg('Virhe: ' + (e && e.message ? e.message : e)); const bb = document.getElementById('kmSaveBtn'); if (bb) bb.disabled = false; }
+ };
+ const saveKmInner = async () => {
  const iso = document.getElementById('kmDate').value, car = document.getElementById('kmCar').value;
  const ks = kmNum(document.getElementById('kmStart').value), ke = kmNum(document.getElementById('kmEnd').value);
  if (!shiftIsoToDate(iso)) { kmMsg('Valitse päivä.'); return; }
@@ -2003,11 +2010,13 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  const sus = [];
  if (ks !== null && prev && ks < kmNum(prev.kmEnd)) sus.push('Aloituslukema (' + ks + ') on pienempi kuin edellinen lopetuslukema (' + kmNum(prev.kmEnd) + ').');
  if (ks !== null && ke !== null && ke - ks > 1500) sus.push('Ajettu matka on ' + (ke - ks) + ' km, tarkista lukemat.');
- if (sus.length && !confirm(sus.join('\n') + '\nTallennetaanko silti?')) return;
+ const ckey = [iso, car, ks, ke].join('|');
+ if (sus.length && kmConfirmKey !== ckey) { kmConfirmKey = ckey; kmMsg('⚠ ' + sus.join('\n') + '\nJos lukemat ovat oikein, paina TALLENNA uudelleen.'); return; }
+ kmConfirmKey = '';
  const b = document.getElementById('kmSaveBtn'); b.disabled = true;
  try {
  kmMsg('Tallennetaan taulukkoon…', '#aaa');
- const res = await scriptCall({ action: 'kmSave', date: iso, car: car, kmStart: ks, kmEnd: ke });
+ const res = await Promise.race([scriptCall({ action: 'kmSave', date: iso, car: car, kmStart: ks, kmEnd: ke }), new Promise((_, rej) => setTimeout(() => rej(new Error('aikakatkaisu (ei vastausta 45 s). Tarkista verkko ja yritä uudelleen')), 45000))]);
  if (!res || !res.ok) throw new Error((res && res.error) || 'ei yhteyttä');
  let t = '✔ Tallennettu: ' + res.car + ' ' + iso.split('-').reverse().join('.') + ' · ' + (res.kmStart !== null ? res.kmStart : '–') + ' → ' + (res.kmEnd !== null ? res.kmEnd : '–') + (res.kmDriven !== null ? ' (' + res.kmDriven + ' km)' : '');
  kmMsg(t, '#7ddf7d');
