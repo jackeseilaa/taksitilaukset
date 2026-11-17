@@ -72,7 +72,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.44 | Päivitetty: 17.11.2026</div>
+<div class="v-tag">V38.45 | Päivitetty: 17.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -289,17 +289,63 @@
  const r = await fetch(SHEET_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: item.action, idToken: idToken, order: item.order }) });
  res = await r.json();
  } catch (e) { res = { ok: false, error: e.message }; }
+ // Tulevan ajon poisto taulukosta: jos palvelin vastasi mutta riviä ei ollut, ei jäädä jumiin
+ if (!res.ok && item.action === "delete" && item.soft && res.error !== undefined && !/fetch|network|load failed|yhteyt/i.test(String(res.error))) res = { ok: true };
  if (!res.ok) { showError("Taulukkoon tallennus epäonnistui (yritetään uudelleen): " + (res.error || "ei yhteyttä")); break; }
  q = loadQueue(); q.shift(); saveQueue(q);
  }
  } finally { syncRunning = false; }
  }
+ // Tulevat (ajamattomat) ajot eivät mene taulukkoon: ne odottavat, kunnes ajon kellonaika on ohi
+ const DEFER_KEY = "kk_sheet_deferred";
+ function loadDeferred() { try { return JSON.parse(localStorage.getItem(DEFER_KEY) || "[]"); } catch (e) { return []; } }
+ function saveDeferred(a) { try { localStorage.setItem(DEFER_KEY, JSON.stringify(a)); } catch (e) {} }
+ function rideStartMs(r) {
+ const d = parseFinnishDate(r && r.date);
+ if (!d) return 0;
+ const m = String((r && r.time) || '').match(/(\d{1,2})[.:](\d{2})/);
+ const t = new Date(d.getTime());
+ t.setHours(m ? +m[1] : 0, m ? +m[2] : 0, 0, 0);
+ return t.getTime();
+ }
+ function isFutureRide(r) { return rideStartMs(r) > Date.now(); }
+ function pushQueue(item) { const q = loadQueue(); q.push(item); saveQueue(q); }
  function queueSheet(action, order) {
  if (!SHEET_URL) return;
- const q = loadQueue();
- q.push({ action: action, order: order });
- saveQueue(q);
+ const id = order && order.id;
+ let def = loadDeferred();
+ if (action === "upsert" && isFutureRide(order)) {
+ if (!def.includes(id)) { def.push(id); saveDeferred(def); }
+ pushQueue({ action: "delete", order: { id: id }, soft: true });
  flushSheetQueue();
+ return;
+ }
+ if (id && def.includes(id)) saveDeferred(def.filter(x => x !== id));
+ pushQueue({ action: action, order: order });
+ flushSheetQueue();
+ }
+ // Ajetaan minuutin välein ja datan latautuessa: vapauttaa ajetut, siirtää tulevat odottamaan
+ function syncDeferredRides() {
+ if (!SHEET_URL || !auth.currentUser || !Array.isArray(currentLogs)) return;
+ const def = loadDeferred();
+ const byId = {}; currentLogs.forEach(r => { byId[r.id] = r; });
+ let changed = false;
+ const keep = [];
+ def.forEach(id => {
+ const r = byId[id];
+ if (!r) { changed = true; return; }
+ if (isFutureRide(r)) { keep.push(id); return; }
+ pushQueue({ action: "upsert", order: Object.assign({ id: id }, sheetData(r)) });
+ changed = true;
+ });
+ currentLogs.forEach(r => {
+ if (isFutureRide(r) && !keep.includes(r.id)) {
+ keep.push(r.id);
+ pushQueue({ action: "delete", order: { id: r.id }, soft: true });
+ changed = true;
+ }
+ });
+ if (changed) { saveDeferred(keep); flushSheetQueue(); }
  }
 
 
@@ -722,6 +768,7 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
                  console.log("✅ Firestore-data vastaanotettu, rivejä:", snap.docs.length);
                  currentLogs = snap.docs.map(d => ({id: d.id, ...d.data()}));
                  renderTable();
+                 syncDeferredRides();
              }, (error) => {
                  console.error("❌ Firestore-virhe:", error);
                  showError("Tietokantavirhe: " + error.message);
@@ -738,7 +785,7 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  });
  console.log("🔧 Firestore listener asetettu, odotetaan dataa...");
  const RIDE_GRACE_MIN = 60;
- setInterval(() => { if (currentLogs && currentLogs.length) renderTable(); }, 60000);
+ setInterval(() => { if (currentLogs && currentLogs.length) { renderTable(); syncDeferredRides(); } }, 60000);
  (function () {
  const sb = document.getElementById('searchBox'), sc = document.getElementById('searchClear');
  let tmr = null;
