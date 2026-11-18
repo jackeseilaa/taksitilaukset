@@ -72,7 +72,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.46 | Päivitetty: 18.11.2026</div>
+<div class="v-tag">V38.47 | Päivitetty: 18.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1852,6 +1852,8 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  };
  window.printLogbook = async (perRide, opts) => {
  const save = !!(opts && opts.save);
+ /* Käsin painettu "oma lehti jokaiselle ajolle" tekee aina yhden lehden per ajo (myös numeroautot ja SMB); Driveen tallennus noudattaa autokohtaisia sääntöjä */
+ const ownSheet = !!perRide && !save;
  const msg = document.getElementById('printMsg');
  const w = save ? null : window.open('', '_blank');
  /* iPhonessa ponnahdusikkuna voi estyä: silloin lehti avataan samassa välilehdessä (Blob-osoite) */
@@ -1893,8 +1895,8 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  if (jr && jr.ok && Array.isArray(jr.shifts)) jr.shifts.forEach(x => { const ck = String(x.car || '').trim().toLowerCase(); if (Number(x.brutto)) shiftBrutto[ck] = Number(x.brutto); shiftKm[ck] = { s: x.kmStart || '', e: x.kmEnd || '', k: x.kmDriven || '', st: x.start || '', en: x.end || '' }; });
  } catch (x) { console.error(x); }
  }
- const kassaOf = (rs) => { const c = String(rs[0].car || '').trim().toLowerCase(); if (/^\d+$/.test(c)) return shiftBrutto[c] || 0; return rs.reduce((a, r) => a + num(r.price), 0); };
- const isNumCar = (rs) => /^\d+$/.test(String(rs[0].car || '').trim());
+ const kassaOf = (rs) => { const c = String(rs[0].car || '').trim().toLowerCase(); if (!ownSheet && /^\d+$/.test(c)) return shiftBrutto[c] || 0; return rs.reduce((a, r) => a + num(r.price), 0); };
+  const isNumCar = (rs) => !ownSheet && /^\d+$/.test(String(rs[0].car || '').trim());
  const shiftT = (rs, k) => { const t = String((shiftKm[String(rs[0].car || '').trim().toLowerCase()] || {})[k] || '').trim(); const m = t.match(/^(\d{1,2}):(\d{2})/); return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : ''; };
  const fld = (lab, val, cls) => '<div class="c ' + (cls || '') + '"><small>' + lab + '</small>' + (val ? '<b>' + e(val) + '</b>' : '') + '</div>';
  const num = (v) => { const n = parseFloat(String(v || '').replace(',', '.')); return isNaN(n) ? 0 : n; };
@@ -1925,7 +1927,7 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  const BLANK = '<div class="page"></div>';
  /* Vuorosta tulee ajopäiväkirja, vaikka kaikki ajot olisi maksettu autoon: silloin yksi lehti ilman ajorivejä */
  /* Taksamittarillisella autolla (numeroauto, SMB) kaikki vuoron ajot samalle lehdelle (5 riviä/lehti, ylimenevät jatkolehdelle); muilla autoilla oma lehti jokaiselle ajolle */
- const isOneSheetCar = (c) => /^(\d+|smb)$/i.test(String(c || '').trim());
+ const isOneSheetCar = (c) => !ownSheet && /^(\d+|smb)$/i.test(String(c || '').trim());
  const chunkRows = (arr, n) => { const o = []; for (let i = 0; i < arr.length; i += n) o.push(arr.slice(i, i + n)); return o; };
  /* Sääntö valitaan autokohtaisesti (ei päivän ensimmäisen ajon mukaan): jos Auto-kenttä on tyhjä, rivit ryhmitellään autoittain */
  const carPages = (rs) => rs.every(isAutoon) ? mkPage(rs) : (isOneSheetCar(rs[0].car) ? chunkRows(rs.filter(r => !isAutoon(r)), 5).map(c => mkPage(c)).join('') : rs.filter(r => !isAutoon(r)).map(r => mkPage([r])).join('') + (rs.some(isAutoon) ? mkPage(rs.filter(isAutoon)) : ''));
