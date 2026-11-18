@@ -784,7 +784,7 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
      }
  });
  console.log("🔧 Firestore listener asetettu, odotetaan dataa...");
- const RIDE_GRACE_MIN = 60;
+ const RIDE_GRACE_MIN = 30;
  setInterval(() => { if (currentLogs && currentLogs.length) { renderTable(); syncDeferredRides(); } }, 60000);
  (function () {
  const sb = document.getElementById('searchBox'), sc = document.getElementById('searchClear');
