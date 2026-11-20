@@ -26,10 +26,11 @@ HUOM: repo on julkinen (GitHub Pages). Älä kirjoita tänne taulukon/Driven tun
 - Älä käytä yksittäisiä lainausmerkkejä fonttilistoissa (rikkoo JS-merkkijonon).
 - Bumppaa versio aina muutoksessa; commit-viestit suomeksi tai lyhyesti.
 
-## Avoin: tulostus
-- HP Envy 4500 (mustesuihku, Mac) tulostaa ajopäiväkirjan sumeana/tuplatun näköisenä; testisivu moitteeton. Kokeiltu: kuva-PDF, 1-bit 300/600 dpi, vektori-PDF (Inter, Carlito) ja toinen tietokone HP-ajurilla: sama tulos. HP-foorumeilla vastaava korjaantui laadulla "Normaali" + "vain musta muste". Käyttäjä kokeilee laserilla.
-- `tools/vektoripdf/build.py`: rakentaa vektori-PDF:n sivujen datasta (data.json) → `google-chrome --headless=new --no-sandbox --no-pdf-header-footer --print-to-pdf=out.pdf out.html`. TrueType-fontti (Carlito) pakollinen; OTF/CFF-fontit (Inter) päätyvät Type 3 -fonteiksi.
-- Jos laser tulostaa vektorin hyvin: vie vektorituloste sovellukseen ja päivitä Driven PDF:t.
+## Tulostus (ratkaistu)
+- HP Envy 4500 (mustesuihku) tulosti ajopäiväkirjan sumeana; laser (testattu 15.–20.11.2026) tulostaa sovelluksen PDF:n erinomaisesti. Vika oli siis tulostimessa, ei sovelluksessa eikä PDF:ssä. Vektoriversiota ei tarvita.
+- Pienet arvokentät (ID, pvm, klo, matkamittari, kassa) ovat 17 px (V38.38): 11 px:llä numerot 2 ja 7 menivät rikki mustesuihkulla.
+- Varalle: `tools/vektoripdf/build.py` rakentaa vektori-PDF:n sivujen datasta (data.json) → `google-chrome --headless=new --no-sandbox --no-pdf-header-footer --print-to-pdf=out.pdf out.html`. TrueType-fontti (Carlito) pakollinen; OTF/CFF-fontit (Inter) päätyvät Type 3 -fonteiksi.
+- Jos mustesuihkulla tulostetaan: laatu "Normaali" + "vain musta muste" voi auttaa.
 
 ## Avoimet asiat
 1. 4.11. ja 5.11. ajopäiväkirjoista puuttuu auton km (käyttäjä täyttää km-toiminnolla, sitten uusinta).
