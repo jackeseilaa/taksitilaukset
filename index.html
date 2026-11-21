@@ -72,7 +72,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.47 | Päivitetty: 18.11.2026</div>
+<div class="v-tag">V38.48 | Päivitetty: 21.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1912,7 +1912,7 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  let trs = '';
  for (let i = 0; i < n; i++) {
  const r = rs[i];
- trs += r ? '<tr><td class="l">' + e(r.time || '') + (r.price ? '<br>' + e(String(r.price).replace('.', ',')) + ' €' : '') + '</td><td>' + e((r.from || '-') + ' → ' + (r.to || '-')) + '<br><span class="s">' + e([r.customer, r.phone, r.orderer ? 'tilaaja ' + r.orderer : '', r.billing ? 'lasku: ' + r.billing : '', r.type && /tavara/i.test(r.type) ? 'Tavarakuljetus' : ''].filter(Boolean).join(' · ')) + '</span></td></tr>' : '<tr><td class="l">&nbsp;</td><td>&nbsp;</td></tr>';
+ trs += r ? '<tr><td class="l">' + e(r.time || '') + (r.price ? '<br>' + e(String(r.price).replace('.', ',')) + ' €' : '') + '</td><td>' + e((r.from || '-') + ' → ' + (r.to || '-')) + '<br><span class="s">' + e([r.customer, r.phone, r.orderer ? 'tilaaja ' + r.orderer : '', r.billing ? 'lasku: ' + r.billing : '', r.type && /tavara/i.test(r.type) ? 'Tavarakuljetus' : ''].filter(Boolean).join(' · ')) + (r.deviation ? '<br>Poikkeama: ' + e(r.deviation) : '') + (r.notes ? '<br>Huom: ' + e(r.notes) : '') + '</span></td></tr>' : '<tr><td class="l">&nbsp;</td><td>&nbsp;</td></tr>';
  }
  const car0 = perRide ? (rsAll[0].car || carNo) : carNo;
  const chk = ['Rekisteriote', 'Liikennelupa', 'Diesel-kortti', 'Autopuhelin', 'Laturi', 'LK-tägi', 'HTD-puhelin'].map(x => '<span><i></i>' + x + '</span>').join('');
