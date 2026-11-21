@@ -13,7 +13,6 @@ HUOM: repo on julkinen (GitHub Pages). Älä kirjoita tänne taulukon/Driven tun
 ## Taulukkosynkka
 - Tulevat (ajamattomat) ajot eivät mene taulukkoon: `queueSheet` siirtää ne listaan `kk_sheet_deferred` (localStorage) ja lähettää soft-deleten; `syncDeferredRides` (datan latautuessa + 60 s välein) lähettää upsertin, kun ajon pvm+klo on ohi. Vapautus vaatii, että sovellus on auki.
 
-- `apps-script/Kalenterivuorot.gs`: Taksi-valikon "Hae vuoroajat kalenterista" (`kalenteriVuorot`) täyttää KASSA-rivien tyhjät Klo/Lopetus-solut kalenterin "Taksi …"-tapahtumista (pvm + auto); ei luo rivejä, ei ylikirjoita. `kalenteriVuorotAjastin` ajastinta varten.
 
 ## Ajopäiväkirja (index.html)
 - Funktiot: `printLogbook(perRide, opts)`, `saveLogbookPdf`, `saveLogbooksFromModal` (#printDate, #printCar, #printMsg), `scriptCall`, `fetchDayShifts`, km-toiminto `openKmModal`/`saveKm`/`kmLoadDay`.
