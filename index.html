@@ -72,7 +72,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.49 | Päivitetty: 23.11.2026</div>
+<div class="v-tag">V38.50 | Päivitetty: 23.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -219,6 +219,7 @@
  <button class="modal-btn ok" onclick="printLogbook()">AJOPÄIVÄKIRJA (TULOSTETTAVA)</button>
  <button class="modal-btn ok" onclick="printLogbook(true)">AJOPÄIVÄKIRJA: OMA LEHTI JOKAISELLE AJOLLE</button>
  <button class="modal-btn ok" onclick="saveLogbooksFromModal()">💾 TALLENNA AJOPÄIVÄKIRJA DRIVEEN (PDF)</button>
+ <button class="modal-btn ok" onclick="saveMonthLogbooksFromModal()">💾 TALLENNA KUUKAUDEN KAIKKI AJOPÄIVÄKIRJAT DRIVEEN</button>
  <button class="modal-btn cancel" onclick="closePrintModal()">SULJE</button>
  </div>
  </div>
@@ -1982,14 +1983,8 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  ifr.srcdoc = html;
  document.body.appendChild(ifr);
  });
- /* Tallenna päivän ajopäiväkirjat (oma lehti jokaiselle ajolle) Driveen: jokaiselle autolle oma PDF */
- window.saveLogbooksFromModal = async () => {
- const msg = document.getElementById('printMsg');
- const show = (t, col) => { msg.textContent = t; msg.style.color = col || '#ff8080'; msg.style.display = 'block'; };
- const iso = document.getElementById('printDate').value;
- const d = shiftIsoToDate(iso);
- if (!d) { show('Valitse päivä.'); return; }
- const carIn = document.getElementById('printCar').value.trim().toLowerCase();
+ /* Päivän autot, joille tehdään ajopäiväkirja: ajot sovelluksesta + numeroautojen/SMB:n vuorot taulukosta */
+ const logbookCarsForDay = async (d, carIn) => {
  const dayKey = shiftFmt(d);
  const cars = [];
  currentLogs.forEach(r => {
@@ -2004,6 +1999,18 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  if (!/^(\d+|smb)$/i.test(c) || (carIn && c.toLowerCase() !== carIn)) return;
  if (!cars.some(y => y.toLowerCase() === c.toLowerCase())) cars.push(c);
  });
+ return cars;
+ };
+ /* Tallenna päivän ajopäiväkirjat (oma lehti jokaiselle ajolle) Driveen: jokaiselle autolle oma PDF */
+ window.saveLogbooksFromModal = async () => {
+ const msg = document.getElementById('printMsg');
+ const show = (t, col) => { msg.textContent = t; msg.style.color = col || '#ff8080'; msg.style.display = 'block'; };
+ const iso = document.getElementById('printDate').value;
+ const d = shiftIsoToDate(iso);
+ if (!d) { show('Valitse päivä.'); return; }
+ const carIn = document.getElementById('printCar').value.trim().toLowerCase();
+ const dayKey = shiftFmt(d);
+ const cars = await logbookCarsForDay(d, carIn);
  if (!cars.length) { show('Ei tilauksia tälle päivälle' + (carIn ? ' ja autolle ' + carIn : '') + '.'); return; }
  const out = [];
  for (const c of cars) {
@@ -2013,6 +2020,34 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  }
  show(out.join('\n'), out.every(x => x.charAt(0) === '✔') ? '#7ddf7d' : '#ffb74d');
  msg.style.whiteSpace = 'pre-line';
+ };
+
+ /* Tallenna valitun kuukauden kaikki ajopäiväkirjat Driveen (päivä kerrallaan, jokaiselle autolle oma PDF; samanniminen korvataan) */
+ window.saveMonthLogbooksFromModal = async () => {
+ if (window._monthSaving) return;
+ const msg = document.getElementById('printMsg');
+ const show = (t, col) => { msg.textContent = t; msg.style.color = col || '#ff8080'; msg.style.display = 'block'; msg.style.whiteSpace = 'pre-line'; };
+ const base = shiftIsoToDate(document.getElementById('printDate').value) || new Date();
+ const carIn = document.getElementById('printCar').value.trim().toLowerCase();
+ const today = new Date(); today.setHours(0, 0, 0, 0);
+ const first = new Date(base.getFullYear(), base.getMonth(), 1);
+ const last = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+ const end = last < today ? last : today;
+ window._monthSaving = true;
+ let done = 0; const fails = [];
+ try {
+ for (let t = new Date(first); t <= end; t.setDate(t.getDate() + 1)) {
+ const day = new Date(t.getTime());
+ show('Haetaan ' + shiftFmt(day) + '… (tallennettu ' + done + ' PDF:ää)', '#aaa');
+ let cars = []; try { cars = await logbookCarsForDay(day, carIn); } catch (e) { fails.push('⚠ ' + shiftFmt(day) + ': ' + e.message); continue; }
+ for (const c of cars) {
+ show('Tallennetaan Driveen: ' + shiftFmt(day) + ' ' + c + '… (tallennettu ' + done + ' PDF:ää)', '#aaa');
+ let r; try { r = await printLogbook(true, { save: true, dateIso: shiftIso(day), car: c }); } catch (e) { r = { ok: false, error: e.message }; }
+ if (r && r.ok) done++; else fails.push('⚠ ' + shiftFmt(day) + ' ' + c + ': ' + ((r && r.error) || 'virhe'));
+ }
+ }
+ } finally { window._monthSaving = false; }
+ show('Valmis: ' + done + ' PDF:ää tallennettu Driveen (' + (first.getMonth() + 1) + '/' + first.getFullYear() + ').' + (fails.length ? '\n' + fails.join('\n') : ''), fails.length ? '#ffb74d' : '#7ddf7d');
  };
  /* ===== Ajovuoron kilometrit (auton oma mittari) ===== */
  const kmShiftCache = {};

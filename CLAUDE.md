@@ -5,7 +5,7 @@ Kommunikoi suomeksi. Rahasummat aina euroina (€). Älä koskaan syötä salasa
 HUOM: repo on julkinen (GitHub Pages). Älä kirjoita tänne taulukon/Driven tunnisteita, henkilötietoja tai salaisuuksia. Ne ovat käyttäjän muistissa / Apps Script -projektissa.
 
 ## Yleiskuva
-- PWA: `index.html` (versiotunniste `<div class="v-tag">V38.xx | Päivitetty: pp.kk.2026</div>`, nyt V38.49). Tausta Firestore.
+- PWA: `index.html` (versiotunniste `<div class="v-tag">V38.xx | Päivitetty: pp.kk.2026</div>`, nyt V38.50). Tausta Firestore.
 - Syöttää Google Sheetin "Taksi_palkat_2026_v11" container-bound Apps Scriptin (web-app) kautta. doPost ajaa DEPLOYATTUA versiota: uusi versio pitää ottaa käyttöön (Ota käyttöön → Hallinnoi käyttöönottoja → kynä → Uusi versio → Ota käyttöön). Nyt versio 61.
 - Taulukon kuukausivälilehdet (esim. MARRAS): otsikkorivi 5, data riviltä 6; KASSA-vuororivi (Selite sarakkeessa G); N=Aloitus km, O=Lopetus km, P=Ajettu km (kaava).
 - Käyttäjä: taksinkuljettaja, AJarmo Oy / Taksipalvelu Simonen Oy. Kuljetuspalvelut vain AJarmo Oy:n kautta; purjehdus, vakuutus ja ajotoiminta pidetään erillään.
@@ -18,6 +18,7 @@ HUOM: repo on julkinen (GitHub Pages). Älä kirjoita tänne taulukon/Driven tun
 ## Ajopäiväkirja (index.html)
 - Funktiot: `printLogbook(perRide, opts)`, `saveLogbookPdf`, `saveLogbooksFromModal` (#printDate, #printCar, #printMsg), `scriptCall`, `fetchDayShifts`, km-toiminto `openKmModal`/`saveKm`/`kmLoadDay`.
 - Säännöt: `isAutoon=/autoon/i`; "Maksu autoon" -ajot eivät kuulu Laskuliitteeseen (tarkoituksella). Numeroautot/SMB: 5 riviä/lehti Driveen tallennuksessa; käsin painettu "oma lehti jokaiselle ajolle" (`ownSheet`) tekee aina yhden lehden per ajo kaikille autoille; tekstiautot (Ix3, Veho C, i7…): yksi lehti per ajo + yksi yhteenvetolehti autoon-ajoille.
+- Kuukausitallennus (V38.50): `saveMonthLogbooksFromModal` (Tulosta-modaalin nappi) tallentaa valitun kuukauden 1. päivästä tähän päivään kaikki ajopäiväkirjat Driveen päivä kerrallaan (`logbookCarsForDay` + `printLogbook(save)`); samanniminen PDF korvataan.
 - Lehdelle tulostuvat ajon kentät: Klo, Hinta, Lähtö→Meno, Matkustaja, Puhelin, Tilaaja, Lasku/Maksaja, Tavarakuljetus sekä Poikkeamat ("Poikkeama: …") ja Huomio ("Huom: …").
 - Auton km syötetään käsin (taksamittarin km ≠ auton mittari).
 - PDF Driveen: html2pdf.js 0.10.1 piilotetussa iframessa (kuvapohjainen). Nimet `Ajopäiväkirja_YYYY-MM-DD_<auto>.pdf`, samanniminen korvataan.
