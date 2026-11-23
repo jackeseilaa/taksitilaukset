@@ -72,7 +72,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.48 | Päivitetty: 21.11.2026</div>
+<div class="v-tag">V38.49 | Päivitetty: 23.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -324,10 +324,17 @@
  pushQueue({ action: action, order: order });
  flushSheetQueue();
  }
+ // Varmistus: viimeisen vuorokauden ajetut ajot lähetetään taulukkoon, vaikka niiden odotus olisi jäänyt toiselle laitteelle
+ const SYNCED_KEY = "kk_sheet_synced";
+ function loadSynced() { try { return JSON.parse(localStorage.getItem(SYNCED_KEY) || "{}"); } catch (e) { return {}; } }
+ function saveSynced(o) { try { localStorage.setItem(SYNCED_KEY, JSON.stringify(o)); } catch (e) {} }
+ function rideHash(o) { const t = JSON.stringify(o); let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return String(h); }
  // Ajetaan minuutin välein ja datan latautuessa: vapauttaa ajetut, siirtää tulevat odottamaan
  function syncDeferredRides() {
  if (!SHEET_URL || !auth.currentUser || !Array.isArray(currentLogs)) return;
  const def = loadDeferred();
+ const synced = loadSynced();
+ let syncedChanged = false;
  const byId = {}; currentLogs.forEach(r => { byId[r.id] = r; });
  let changed = false;
  const keep = [];
@@ -335,7 +342,9 @@
  const r = byId[id];
  if (!r) { changed = true; return; }
  if (isFutureRide(r)) { keep.push(id); return; }
- pushQueue({ action: "upsert", order: Object.assign({ id: id }, sheetData(r)) });
+ const od = sheetData(r);
+ synced[id] = rideHash(od); syncedChanged = true;
+ pushQueue({ action: "upsert", order: Object.assign({ id: id }, od) });
  changed = true;
  });
  currentLogs.forEach(r => {
@@ -345,6 +354,18 @@
  changed = true;
  }
  });
+ // Eilisen ja tämän päivän ajetut ajot, joita tämä laite ei ole vielä lähettänyt (tai jotka ovat muuttuneet)
+ const since = new Date(); since.setHours(0, 0, 0, 0); since.setDate(since.getDate() - 1);
+ currentLogs.forEach(r => {
+ if (!r || !r.id || isFutureRide(r) || rideStartMs(r) < since.getTime()) return;
+ const od = sheetData(r);
+ const h = rideHash(od);
+ if (synced[r.id] === h) return;
+ synced[r.id] = h; syncedChanged = true;
+ pushQueue({ action: "upsert", order: Object.assign({ id: r.id }, od) });
+ changed = true;
+ });
+ if (syncedChanged) saveSynced(synced);
  if (changed) { saveDeferred(keep); flushSheetQueue(); }
  }
 

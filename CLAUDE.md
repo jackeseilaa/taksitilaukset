@@ -5,13 +5,14 @@ Kommunikoi suomeksi. Rahasummat aina euroina (€). Älä koskaan syötä salasa
 HUOM: repo on julkinen (GitHub Pages). Älä kirjoita tänne taulukon/Driven tunnisteita, henkilötietoja tai salaisuuksia. Ne ovat käyttäjän muistissa / Apps Script -projektissa.
 
 ## Yleiskuva
-- PWA: `index.html` (versiotunniste `<div class="v-tag">V38.xx | Päivitetty: pp.kk.2026</div>`, nyt V38.48). Tausta Firestore.
+- PWA: `index.html` (versiotunniste `<div class="v-tag">V38.xx | Päivitetty: pp.kk.2026</div>`, nyt V38.49). Tausta Firestore.
 - Syöttää Google Sheetin "Taksi_palkat_2026_v11" container-bound Apps Scriptin (web-app) kautta. doPost ajaa DEPLOYATTUA versiota: uusi versio pitää ottaa käyttöön (Ota käyttöön → Hallinnoi käyttöönottoja → kynä → Uusi versio → Ota käyttöön). Nyt versio 61.
 - Taulukon kuukausivälilehdet (esim. MARRAS): otsikkorivi 5, data riviltä 6; KASSA-vuororivi (Selite sarakkeessa G); N=Aloitus km, O=Lopetus km, P=Ajettu km (kaava).
 - Käyttäjä: taksinkuljettaja, AJarmo Oy / Taksipalvelu Simonen Oy. Kuljetuspalvelut vain AJarmo Oy:n kautta; purjehdus, vakuutus ja ajotoiminta pidetään erillään.
 
 ## Taulukkosynkka
 - Tulevat (ajamattomat) ajot eivät mene taulukkoon: `queueSheet` siirtää ne listaan `kk_sheet_deferred` (localStorage) ja lähettää soft-deleten; `syncDeferredRides` (datan latautuessa + 60 s välein) lähettää upsertin, kun ajon pvm+klo on ohi. Vapautus vaatii, että sovellus on auki.
+- Varmistus (V38.49): `syncDeferredRides` lähettää lisäksi kaikki eilisen ja tämän päivän jo alkaneet ajot taulukkoon, jos laite ei ole niitä vielä lähettänyt tai ne ovat muuttuneet (`kk_sheet_synced`: id → hash). Näin ajo ei jää pois, vaikka odotus olisi ollut toisen laitteen muistissa. Upsert on idempotentti (id).
 
 
 ## Ajopäiväkirja (index.html)
