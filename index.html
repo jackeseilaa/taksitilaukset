@@ -72,7 +72,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.50 | Päivitetty: 23.11.2026</div>
+<div class="v-tag">V38.51 | Päivitetty: 26.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -1144,6 +1144,8 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  for (let i = 0; i < lines.length; i++) {
  if (lines[i].match(/^(lähtö|from|mistä|lähto|origin|nouto|noutopaikka|noutoosoite|noutoosoitteet)/i)) {
  let fromLines = [];
+ const mFrom = lines[i].match(/^(?:lähtö|from|mistä|lähto|origin|nouto|noutopaikka|noutoosoite|noutoosoitteet)\s*[:\-–]\s*(.+)$/i);
+ if (mFrom && mFrom[1].trim()) fromLines.push(mFrom[1].trim());
  for (let j = i + 1; j < lines.length && j < i + 3; j++) {
  const line = lines[j].trim();
  if (!line || line.match(/^(meno|to|mihin|kohde|määränpää|tilaaja|nimi|kyytiin|hinta|lasku|huomio|ok|väli)/i)) break;
@@ -1156,6 +1158,8 @@ document.getElementById('btnLogin')?.addEventListener('click', async () => {
  for (let i = 0; i < lines.length; i++) {
  if (lines[i].match(/^(meno|to|mihin|kohde|määränpää|destination)/i)) {
  let toLines = [];
+ const mTo = lines[i].match(/^(?:meno|to|mihin|kohde|määränpää|destination)\s*[:\-–]\s*(.+)$/i);
+ if (mTo && mTo[1].trim()) toLines.push(mTo[1].trim());
  for (let j = i + 1; j < lines.length && j < i + 3; j++) {
  const line = lines[j].trim();
  if (!line || line.match(/^(nimi|kyytiin|hinta|tilaaja|lasku|huomio|ok)/i)) break;
