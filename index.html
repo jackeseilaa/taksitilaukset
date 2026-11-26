@@ -72,7 +72,7 @@
     <p id="auth-error" style="color:#ff4444;min-height:20px;margin:0;font-size:13px;"></p>
 </div>
 <div id="app-root" style="display:none;">
-<div class="v-tag">V38.51 | Päivitetty: 26.11.2026</div>
+<div class="v-tag">V38.52 | Päivitetty: 26.11.2026</div>
 <h1>KULJETUSKIRJA</h1>
 <div class="edit-mode-indicator" id="editModeIndicator">✎ MUOKKAA-TILA AKTIIVINEN</div>
 <textarea id="msgInput" placeholder="LIITÄ VIESTI TÄHÄN..." oninput="parseMessage()"></textarea>
@@ -309,7 +309,8 @@
  t.setHours(m ? +m[1] : 0, m ? +m[2] : 0, 0, 0);
  return t.getTime();
  }
- function isFutureRide(r) { return rideStartMs(r) > Date.now(); }
+ /* Tuleva = ajon päivä on huomenna tai myöhemmin. Saman päivän ajot menevät taulukkoon heti (aikaa voi muuttaa myöhemmin). */
+ function isFutureRide(r) { const t = new Date(); t.setHours(0, 0, 0, 0); t.setDate(t.getDate() + 1); return rideStartMs(r) >= t.getTime(); }
  function pushQueue(item) { const q = loadQueue(); q.push(item); saveQueue(q); }
  function queueSheet(action, order) {
  if (!SHEET_URL) return;
